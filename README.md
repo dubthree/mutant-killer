@@ -140,8 +140,18 @@ See `src/main/resources/prompts/` for the default templates you can customize.
 - Java 21+
 - Maven or Gradle (for target projects)
 - PIT plugin configured in target project (or uses default config)
-- GitHub token with repo access
+- Git hosting token (GitHub, GitLab, or Azure DevOps)
 - Anthropic API key
+
+## Supported Git Providers
+
+| Provider | URL Pattern | Token Type |
+|----------|-------------|------------|
+| **GitHub** | `github.com/owner/repo` | Personal Access Token |
+| **GitLab** | `gitlab.com/group/repo` | Personal Access Token |
+| **Azure DevOps** | `dev.azure.com/org/project/_git/repo` | Personal Access Token |
+
+Self-hosted GitLab instances are also supported. The provider is auto-detected from the URL.
 
 ## PR Format
 

@@ -41,8 +41,8 @@ public class RepositoryManager {
             git("reset", "--hard", "origin/" + branch);
             git("clean", "-fd");
         } else {
-            // Clone fresh
-            String authUrl = injectToken(repoUrl);
+            // Clone fresh - use provider-agnostic auth injection
+            String authUrl = GitProvider.injectAuth(repoUrl, token);
             gitInDir(workDir, "clone", "--branch", branch, authUrl, repoName);
         }
 
@@ -128,12 +128,4 @@ public class RepositoryManager {
         return name;
     }
 
-    private String injectToken(String url) {
-        // Convert https://github.com/owner/repo to https://x-access-token:TOKEN@github.com/owner/repo
-        if (url.startsWith("https://github.com/")) {
-            return url.replace("https://github.com/", 
-                "https://x-access-token:" + token + "@github.com/");
-        }
-        return url;
-    }
 }

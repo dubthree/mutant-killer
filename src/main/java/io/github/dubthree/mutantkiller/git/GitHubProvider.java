@@ -12,9 +12,9 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 
 /**
- * GitHub API client for creating pull requests.
+ * GitHub implementation of GitProvider.
  */
-public class GitHubClient {
+public class GitHubProvider implements GitProvider {
 
     private static final String API_BASE = "https://api.github.com";
     
@@ -24,7 +24,7 @@ public class GitHubClient {
     private final HttpClient httpClient;
     private final ObjectMapper objectMapper;
 
-    public GitHubClient(String token, String owner, String repo) {
+    public GitHubProvider(String token, String owner, String repo) {
         this.token = token;
         this.owner = owner;
         this.repo = repo;
@@ -34,11 +34,14 @@ public class GitHubClient {
         this.objectMapper = new ObjectMapper();
     }
 
-    /**
-     * Create a pull request and return its URL.
-     */
+    @Override
+    public String name() {
+        return "GitHub";
+    }
+
+    @Override
     public String createPullRequest(String headBranch, String baseBranch, String title, String body) 
-            throws IOException, InterruptedException {
+            throws Exception {
         
         String url = String.format("%s/repos/%s/%s/pulls", API_BASE, owner, repo);
         
@@ -67,7 +70,6 @@ public class GitHubClient {
             JsonNode responseJson = objectMapper.readTree(response.body());
             String message = responseJson.has("message") ? responseJson.get("message").asText() : "";
             if (message.contains("A pull request already exists")) {
-                // Try to find existing PR
                 return findExistingPr(headBranch, baseBranch);
             }
             throw new IOException("Failed to create PR: " + response.body());
@@ -76,10 +78,25 @@ public class GitHubClient {
         }
     }
 
-    /**
-     * Find an existing PR for the given branches.
-     */
-    private String findExistingPr(String headBranch, String baseBranch) throws IOException, InterruptedException {
+    @Override
+    public void addComment(String prId, String comment) throws Exception {
+        String url = String.format("%s/repos/%s/%s/issues/%s/comments", API_BASE, owner, repo, prId);
+        
+        ObjectNode payload = objectMapper.createObjectNode();
+        payload.put("body", comment);
+
+        HttpRequest request = HttpRequest.newBuilder()
+            .uri(URI.create(url))
+            .header("Authorization", "Bearer " + token)
+            .header("Accept", "application/vnd.github+json")
+            .header("Content-Type", "application/json")
+            .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(payload)))
+            .build();
+
+        httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+    }
+
+    private String findExistingPr(String headBranch, String baseBranch) throws Exception {
         String url = String.format("%s/repos/%s/%s/pulls?head=%s:%s&base=%s", 
             API_BASE, owner, repo, owner, headBranch, baseBranch);
 
@@ -100,25 +117,5 @@ public class GitHubClient {
         }
         
         return "PR exists but could not find URL";
-    }
-
-    /**
-     * Add a comment to a PR.
-     */
-    public void addComment(int prNumber, String comment) throws IOException, InterruptedException {
-        String url = String.format("%s/repos/%s/%s/issues/%d/comments", API_BASE, owner, repo, prNumber);
-        
-        ObjectNode payload = objectMapper.createObjectNode();
-        payload.put("body", comment);
-
-        HttpRequest request = HttpRequest.newBuilder()
-            .uri(URI.create(url))
-            .header("Authorization", "Bearer " + token)
-            .header("Accept", "application/vnd.github+json")
-            .header("Content-Type", "application/json")
-            .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(payload)))
-            .build();
-
-        httpClient.send(request, HttpResponse.BodyHandlers.ofString());
     }
 }
