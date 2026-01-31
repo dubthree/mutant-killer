@@ -21,10 +21,10 @@ git clone https://github.com/dubthree/mutant-killer.git
 cd mutant-killer
 
 # Build
-./gradlew build
+mvn clean package
 
 # Or install locally
-./gradlew installDist
+mvn install
 ```
 
 ## Usage
@@ -38,22 +38,27 @@ cd mutant-killer
 
 2. Run PIT on your project to generate a mutations report:
    ```bash
-   ./gradlew pitest
+   mvn pitest:mutationCoverage
    ```
 
 ### Analyze Surviving Mutants
 
 ```bash
-./gradlew run --args="analyze path/to/pit-reports/mutations.xml"
+java -jar target/mutant-killer-0.1.0-SNAPSHOT.jar analyze path/to/pit-reports/mutations.xml
+```
+
+Or with Maven:
+```bash
+mvn exec:java -Dexec.args="analyze path/to/pit-reports/mutations.xml"
 ```
 
 ### Kill Surviving Mutants
 
 ```bash
-./gradlew run --args="kill path/to/pit-reports/mutations.xml \
+java -jar target/mutant-killer-0.1.0-SNAPSHOT.jar kill path/to/pit-reports/mutations.xml \
   --source src/main/java \
   --test src/test/java \
-  --dry-run"
+  --dry-run
 ```
 
 Options:
@@ -68,24 +73,24 @@ Options:
 
 ```bash
 # Run PIT first
-./gradlew pitest
+mvn pitest:mutationCoverage
 
 # Analyze what survived
-./gradlew run --args="analyze build/reports/pitest/mutations.xml"
+java -jar target/mutant-killer-0.1.0-SNAPSHOT.jar analyze target/pit-reports/mutations.xml
 
 # Generate improvements (dry run)
-./gradlew run --args="kill build/reports/pitest/mutations.xml \
+java -jar target/mutant-killer-0.1.0-SNAPSHOT.jar kill target/pit-reports/mutations.xml \
   -s src/main/java \
   -t src/test/java \
-  --dry-run"
+  --dry-run
 
 # Apply improvements
-./gradlew run --args="kill build/reports/pitest/mutations.xml \
+java -jar target/mutant-killer-0.1.0-SNAPSHOT.jar kill target/pit-reports/mutations.xml \
   -s src/main/java \
-  -t src/test/java"
+  -t src/test/java
 
 # Verify mutations are now killed
-./gradlew pitest
+mvn pitest:mutationCoverage
 ```
 
 ## Configuration
@@ -95,8 +100,9 @@ Options:
 The default model is `claude-sonnet-4-20250514`. For more complex mutations, you might want to use Claude Opus:
 
 ```bash
-./gradlew run --args="kill mutations.xml -s src/main/java -t src/test/java \
-  --model claude-opus-4-20250514"
+java -jar target/mutant-killer-0.1.0-SNAPSHOT.jar kill mutations.xml \
+  -s src/main/java -t src/test/java \
+  --model claude-opus-4-20250514
 ```
 
 ### Supported Models
