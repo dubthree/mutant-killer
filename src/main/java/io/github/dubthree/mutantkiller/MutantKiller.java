@@ -2,6 +2,7 @@ package io.github.dubthree.mutantkiller;
 
 import io.github.dubthree.mutantkiller.cli.AnalyzeCommand;
 import io.github.dubthree.mutantkiller.cli.KillCommand;
+import io.github.dubthree.mutantkiller.cli.RunCommand;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 
@@ -15,6 +16,7 @@ import picocli.CommandLine.Command;
     version = "0.1.0",
     description = "Autonomous agent that kills surviving mutants by improving your tests.",
     subcommands = {
+        RunCommand.class,
         AnalyzeCommand.class,
         KillCommand.class
     }

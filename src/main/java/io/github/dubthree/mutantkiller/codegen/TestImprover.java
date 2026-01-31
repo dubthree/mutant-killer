@@ -17,7 +17,7 @@ import java.util.regex.Pattern;
  */
 public class TestImprover {
 
-    private static final String SYSTEM_PROMPT = """
+    private static final String DEFAULT_SYSTEM_PROMPT = """
         You are an expert Java developer specializing in test-driven development and mutation testing.
         Your task is to improve unit tests to catch mutations that currently survive.
         
@@ -39,12 +39,17 @@ public class TestImprover {
 
     private final MutantKillerConfig config;
     private final AnthropicClient client;
+    private final String systemPrompt;
 
     public TestImprover(MutantKillerConfig config) {
         this.config = config;
         this.client = AnthropicOkHttpClient.builder()
             .apiKey(config.apiKey())
             .build();
+        
+        // Load custom system prompt or use default
+        String customPrompt = config.loadPrompt("system");
+        this.systemPrompt = customPrompt != null ? customPrompt : DEFAULT_SYSTEM_PROMPT;
     }
 
     /**
@@ -61,7 +66,7 @@ public class TestImprover {
             MessageCreateParams params = MessageCreateParams.builder()
                 .model(config.model())
                 .maxTokens(2048)
-                .system(SYSTEM_PROMPT)
+                .system(systemPrompt)
                 .messages(List.of(
                     MessageParam.builder()
                         .role(MessageParam.Role.USER)

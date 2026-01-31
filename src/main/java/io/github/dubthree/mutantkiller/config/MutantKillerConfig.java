@@ -1,5 +1,7 @@
 package io.github.dubthree.mutantkiller.config;
 
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 
 /**
@@ -10,6 +12,7 @@ public record MutantKillerConfig(
     String apiKey,
     Path sourceDir,
     Path testDir,
+    Path promptDir,
     boolean dryRun,
     boolean verbose
 ) {
@@ -17,11 +20,40 @@ public record MutantKillerConfig(
         return new Builder();
     }
 
+    /**
+     * Load a prompt template, checking custom promptDir first, then defaults.
+     */
+    public String loadPrompt(String name) {
+        // Try custom prompt directory first
+        if (promptDir != null) {
+            Path customPrompt = promptDir.resolve(name + ".md");
+            if (Files.exists(customPrompt)) {
+                try {
+                    return Files.readString(customPrompt);
+                } catch (IOException e) {
+                    // Fall through to default
+                }
+            }
+        }
+        
+        // Load from classpath
+        try (var stream = getClass().getResourceAsStream("/prompts/" + name + ".md")) {
+            if (stream != null) {
+                return new String(stream.readAllBytes());
+            }
+        } catch (IOException e) {
+            // Fall through to hardcoded default
+        }
+        
+        return null;
+    }
+
     public static class Builder {
         private String model = "claude-sonnet-4-20250514";
         private String apiKey;
         private Path sourceDir;
         private Path testDir;
+        private Path promptDir;
         private boolean dryRun = false;
         private boolean verbose = false;
 
@@ -45,6 +77,11 @@ public record MutantKillerConfig(
             return this;
         }
 
+        public Builder promptDir(Path promptDir) {
+            this.promptDir = promptDir;
+            return this;
+        }
+
         public Builder dryRun(boolean dryRun) {
             this.dryRun = dryRun;
             return this;
@@ -63,7 +100,7 @@ public record MutantKillerConfig(
                 throw new IllegalStateException(
                     "Anthropic API key not set. Set ANTHROPIC_API_KEY environment variable.");
             }
-            return new MutantKillerConfig(model, apiKey, sourceDir, testDir, dryRun, verbose);
+            return new MutantKillerConfig(model, apiKey, sourceDir, testDir, promptDir, dryRun, verbose);
         }
     }
 }

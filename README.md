@@ -1,147 +1,176 @@
 # Mutant Killer 🔪
 
-An autonomous agent that analyzes [PIT](https://pitest.org/) mutation test results and improves your tests to kill surviving mutants.
+An autonomous agent that clones a repository, runs [PIT](https://pitest.org/) mutation testing, and creates pull requests to kill surviving mutants.
 
 ## What It Does
 
-1. **Analyzes** PIT mutation reports to find surviving mutants
-2. **Understands** what code behavior the mutation changes
-3. **Generates** new test methods or improves existing ones using Claude
-4. **Applies** the changes to your test files (or shows a dry-run preview)
+1. **Clones** a GitHub repository
+2. **Runs** PIT mutation testing
+3. **Analyzes** each surviving mutant with Claude
+4. **Creates PRs** — one branch and PR per mutant fix
 
-## Why?
+## Quick Start
 
-Mutation testing tells you *which* mutations survive, but not *how* to fix your tests. Mutant Killer bridges that gap by using AI to understand what's missing and generate targeted test improvements.
+```bash
+# Set your tokens
+export ANTHROPIC_API_KEY=your_anthropic_key
+export GITHUB_TOKEN=your_github_token
+
+# Run against a repository
+java -jar mutant-killer.jar run https://github.com/user/repo
+```
+
+That's it. The agent will:
+1. Clone the repo
+2. Run mutation tests
+3. Create a PR for each surviving mutant it can fix
 
 ## Installation
 
 ```bash
-# Clone the repo
 git clone https://github.com/dubthree/mutant-killer.git
 cd mutant-killer
-
-# Build
 mvn clean package
-
-# Or install locally
-mvn install
 ```
 
 ## Usage
 
-### Prerequisites
-
-1. Set your Anthropic API key:
-   ```bash
-   export ANTHROPIC_API_KEY=your_key_here
-   ```
-
-2. Run PIT on your project to generate a mutations report:
-   ```bash
-   mvn pitest:mutationCoverage
-   ```
-
-### Analyze Surviving Mutants
+### Full Autonomous Mode
 
 ```bash
-java -jar target/mutant-killer-0.1.0-SNAPSHOT.jar analyze path/to/pit-reports/mutations.xml
-```
-
-Or with Maven:
-```bash
-mvn exec:java -Dexec.args="analyze path/to/pit-reports/mutations.xml"
-```
-
-### Kill Surviving Mutants
-
-```bash
-java -jar target/mutant-killer-0.1.0-SNAPSHOT.jar kill path/to/pit-reports/mutations.xml \
-  --source src/main/java \
-  --test src/test/java \
-  --dry-run
-```
-
-Options:
-- `--source`, `-s`: Path to main source directory
-- `--test`, `-t`: Path to test source directory  
-- `--model`: Claude model to use (default: `claude-sonnet-4-20250514`)
-- `--dry-run`: Show proposed changes without applying
-- `--max-mutants`: Maximum mutants to process (default: 10)
-- `--verbose`, `-v`: Verbose output
-
-### Example
-
-```bash
-# Run PIT first
-mvn pitest:mutationCoverage
-
-# Analyze what survived
-java -jar target/mutant-killer-0.1.0-SNAPSHOT.jar analyze target/pit-reports/mutations.xml
-
-# Generate improvements (dry run)
-java -jar target/mutant-killer-0.1.0-SNAPSHOT.jar kill target/pit-reports/mutations.xml \
-  -s src/main/java \
-  -t src/test/java \
-  --dry-run
-
-# Apply improvements
-java -jar target/mutant-killer-0.1.0-SNAPSHOT.jar kill target/pit-reports/mutations.xml \
-  -s src/main/java \
-  -t src/test/java
-
-# Verify mutations are now killed
-mvn pitest:mutationCoverage
-```
-
-## Configuration
-
-### Model Selection
-
-The default model is `claude-sonnet-4-20250514`. For more complex mutations, you might want to use Claude Opus:
-
-```bash
-java -jar target/mutant-killer-0.1.0-SNAPSHOT.jar kill mutations.xml \
-  -s src/main/java -t src/test/java \
+java -jar target/mutant-killer-0.1.0-SNAPSHOT.jar run https://github.com/user/repo \
+  --max-mutants 10 \
   --model claude-opus-4-20250514
 ```
 
-### Supported Models
+Options:
+- `--base-branch`: Branch to work from (default: `main`)
+- `--model`: Claude model (default: `claude-sonnet-4-20250514`)
+- `--max-mutants`: Max mutants to process (default: 10)
+- `--dry-run`: Analyze without creating PRs
+- `--work-dir`: Where to clone repos
+- `--prompt-dir`: Custom prompt templates
+- `--verbose`: Show detailed output
 
-- `claude-opus-4-20250514` (most capable)
-- `claude-sonnet-4-20250514` (default, good balance)
-- Any other Anthropic model identifier
+### Dry Run (Preview)
+
+```bash
+java -jar target/mutant-killer-0.1.0-SNAPSHOT.jar run https://github.com/user/repo --dry-run
+```
+
+Shows what fixes would be generated without creating any PRs.
+
+### Analyze Existing Report
+
+If you already have a PIT report:
+
+```bash
+java -jar target/mutant-killer-0.1.0-SNAPSHOT.jar analyze path/to/mutations.xml
+```
+
+### Local Kill Mode
+
+Generate fixes for a local project without PRs:
+
+```bash
+java -jar target/mutant-killer-0.1.0-SNAPSHOT.jar kill path/to/mutations.xml \
+  --source src/main/java \
+  --test src/test/java
+```
+
+## Custom Prompts
+
+You can customize how mutants are analyzed by providing your own prompt templates.
+
+Create a directory with your prompts:
+
+```
+my-prompts/
+├── system.md    # System prompt for Claude
+└── analyze.md   # Per-mutant analysis prompt
+```
+
+Then run with:
+
+```bash
+java -jar mutant-killer.jar run https://github.com/user/repo --prompt-dir ./my-prompts
+```
+
+### Default Prompts
+
+See `src/main/resources/prompts/` for the default templates you can customize.
+
+**system.md** — Defines Claude's role and guidelines for generating tests.
+
+**analyze.md** — Template for each mutation, with placeholders:
+- `{{mutatedClass}}`, `{{mutatedMethod}}`, `{{lineNumber}}`
+- `{{mutatorDescription}}`, `{{contextAroundMutation}}`
+- `{{existingTestCode}}`
 
 ## How It Works
 
-1. **Parse PIT Report**: Reads the XML mutations report to identify surviving mutants
-2. **Gather Context**: Finds the source file, extracts the mutated method, locates existing tests
-3. **Analyze with Claude**: Sends mutation details and code context to Claude
-4. **Generate Tests**: Claude generates test methods specifically designed to catch the mutation
-5. **Apply Changes**: Adds new methods to existing test classes or creates new test files
+```
+┌──────────────────┐
+│  Clone Repo      │
+└────────┬─────────┘
+         │
+         ▼
+┌──────────────────┐
+│  Run PIT         │──► Detect Maven/Gradle
+└────────┬─────────┘    Run mutation tests
+         │
+         ▼
+┌──────────────────┐
+│  Parse Report    │──► Find surviving mutants
+└────────┬─────────┘
+         │
+         ▼
+┌──────────────────────────────────────────┐
+│  For each mutant:                        │
+│  1. Create branch: mutant-killer/fix-xxx │
+│  2. Analyze with Claude                  │
+│  3. Generate test improvement            │
+│  4. Commit and push                      │
+│  5. Create PR                            │
+└──────────────────────────────────────────┘
+```
+
+## Requirements
+
+- Java 21+
+- Maven or Gradle (for target projects)
+- PIT plugin configured in target project (or uses default config)
+- GitHub token with repo access
+- Anthropic API key
+
+## PR Format
+
+Each generated PR includes:
+- **Title**: `Kill mutant in ClassName.methodName`
+- **Body**: Mutation details, explanation, and the generated test code
+- **Branch**: `mutant-killer/fix-<class>-<method>-<line>-<index>`
+
+## Supported Models
+
+- `claude-opus-4-20250514` — Most capable, best for complex mutations
+- `claude-sonnet-4-20250514` — Default, good balance of speed and quality
 
 ## Limitations
 
-- Currently supports Java projects only
+- Java projects only (Maven or Gradle)
 - Requires PIT for mutation testing
-- Generated tests should be reviewed before committing
-- Complex mutations may require manual refinement
+- Target project must compile and have tests
+- Generated tests should be reviewed before merging
 
 ## Contributing
 
-Contributions welcome! Areas of interest:
-- Support for other mutation testing tools (Stryker, mutmut)
-- Support for other languages
-- Improved test generation strategies
-- Better code modification handling
+Areas of interest:
+- Support for Gradle Kotlin DSL
+- Support for other languages (Stryker for JS/TS, mutmut for Python)
+- Improved prompt engineering
+- Batch PR creation
+- Integration with CI/CD
 
 ## License
 
 MIT
-
-## Credits
-
-Built with:
-- [PIT](https://pitest.org/) - Mutation testing for Java
-- [Claude](https://anthropic.com) - AI for test generation
-- [JavaParser](https://javaparser.org/) - Java code analysis
-- [picocli](https://picocli.info/) - CLI framework
