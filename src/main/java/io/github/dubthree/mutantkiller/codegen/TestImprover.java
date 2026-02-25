@@ -2,7 +2,10 @@ package io.github.dubthree.mutantkiller.codegen;
 
 import com.anthropic.client.AnthropicClient;
 import com.anthropic.client.okhttp.AnthropicOkHttpClient;
-import com.anthropic.models.messages.*;
+import com.anthropic.models.messages.ContentBlock;
+import com.anthropic.models.messages.MessageCreateParams;
+import com.anthropic.models.messages.MessageParam;
+import com.anthropic.models.messages.Message;
 import io.github.dubthree.mutantkiller.analysis.MutantAnalysis;
 import io.github.dubthree.mutantkiller.config.MutantKillerConfig;
 import io.github.dubthree.mutantkiller.pit.MutationResult;
@@ -78,8 +81,8 @@ public class TestImprover {
             Message response = client.messages().create(params);
             
             String content = response.content().stream()
-                .filter(block -> block instanceof TextBlock)
-                .map(block -> ((TextBlock) block).text())
+                .filter(ContentBlock::isText)
+                .map(block -> block.asText().text())
                 .findFirst()
                 .orElse("");
 

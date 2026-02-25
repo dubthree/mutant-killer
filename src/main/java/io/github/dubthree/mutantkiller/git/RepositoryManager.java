@@ -114,12 +114,15 @@ public class RepositoryManager {
         }
 
         if (process.exitValue() != 0) {
-            throw new IOException("Git command failed: " + String.join(" ", args) + "\n" + output);
+            // Sanitize output to avoid leaking tokens in error messages
+            String sanitizedOutput = token != null && !token.isEmpty()
+                ? output.toString().replace(token, "***")
+                : output.toString();
+            throw new IOException("Git command failed: " + String.join(" ", args) + "\n" + sanitizedOutput);
         }
     }
 
-    private String extractRepoName(String url) {
-        // Extract repo name from URL
+    public static String extractRepoName(String url) {
         String name = url.replaceAll("\\.git$", "");
         int lastSlash = name.lastIndexOf('/');
         if (lastSlash >= 0) {

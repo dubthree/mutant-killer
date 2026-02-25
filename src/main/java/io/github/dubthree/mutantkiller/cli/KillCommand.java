@@ -3,6 +3,7 @@ package io.github.dubthree.mutantkiller.cli;
 import io.github.dubthree.mutantkiller.analysis.MutantAnalyzer;
 import io.github.dubthree.mutantkiller.codegen.TestImprover;
 import io.github.dubthree.mutantkiller.config.MutantKillerConfig;
+import static io.github.dubthree.mutantkiller.config.MutantKillerConfig.DEFAULT_MODEL;
 import io.github.dubthree.mutantkiller.pit.MutationResult;
 import io.github.dubthree.mutantkiller.pit.PitReportParser;
 import picocli.CommandLine.Command;
@@ -31,7 +32,7 @@ public class KillCommand implements Callable<Integer> {
     @Option(names = {"-t", "--test"}, description = "Test source directory", required = true)
     private File testDir;
 
-    @Option(names = {"--model"}, description = "LLM model to use", defaultValue = "claude-sonnet-4-20250514")
+    @Option(names = {"--model"}, description = "LLM model to use", defaultValue = DEFAULT_MODEL)
     private String model;
 
     @Option(names = {"--dry-run"}, description = "Show proposed changes without applying")

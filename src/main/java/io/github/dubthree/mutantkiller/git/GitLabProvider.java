@@ -90,7 +90,11 @@ public class GitLabProvider implements GitProvider {
             .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(payload)))
             .build();
 
-        httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        HttpResponse<String> commentResponse = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        if (commentResponse.statusCode() < 200 || commentResponse.statusCode() >= 300) {
+            throw new IOException("Failed to add comment (HTTP " + commentResponse.statusCode() + "): "
+                + commentResponse.body());
+        }
     }
 
     private String findExistingMr(String sourceBranch, String targetBranch) throws Exception {

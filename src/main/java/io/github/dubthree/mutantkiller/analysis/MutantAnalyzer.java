@@ -79,13 +79,22 @@ public class MutantAnalyzer {
     }
 
     private Path findTestFile(String className) {
-        String simpleClassName = className.substring(className.lastIndexOf('.') + 1);
+        int lastDot = className.lastIndexOf('.');
+        String simpleClassName = lastDot >= 0 ? className.substring(lastDot + 1) : className;
         String testClassName = simpleClassName + "Test";
-        String packagePath = className.substring(0, className.lastIndexOf('.')).replace('.', '/');
-        
-        Path candidate = config.testDir().resolve(packagePath).resolve(testClassName + ".java");
-        if (Files.exists(candidate)) {
-            return candidate;
+
+        if (lastDot >= 0) {
+            String packagePath = className.substring(0, lastDot).replace('.', '/');
+            Path candidate = config.testDir().resolve(packagePath).resolve(testClassName + ".java");
+            if (Files.exists(candidate)) {
+                return candidate;
+            }
+        } else {
+            // Default package
+            Path candidate = config.testDir().resolve(testClassName + ".java");
+            if (Files.exists(candidate)) {
+                return candidate;
+            }
         }
         return null;
     }

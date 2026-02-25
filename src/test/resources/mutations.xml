@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mutations>
+    <mutation detected="false" status="SURVIVED" numberOfTestsRun="3">
+        <sourceFile>Calculator.java</sourceFile>
+        <mutatedClass>com.example.Calculator</mutatedClass>
+        <mutatedMethod>add</mutatedMethod>
+        <methodDescription>(II)I</methodDescription>
+        <lineNumber>10</lineNumber>
+        <mutator>org.pitest.mutationtest.engine.gregor.mutators.MathMutator</mutator>
+        <description>Replaced integer addition with subtraction</description>
+        <killingTest/>
+    </mutation>
+    <mutation detected="true" status="KILLED" numberOfTestsRun="5">
+        <sourceFile>Calculator.java</sourceFile>
+        <mutatedClass>com.example.Calculator</mutatedClass>
+        <mutatedMethod>subtract</mutatedMethod>
+        <methodDescription>(II)I</methodDescription>
+        <lineNumber>15</lineNumber>
+        <mutator>org.pitest.mutationtest.engine.gregor.mutators.MathMutator</mutator>
+        <description>Replaced integer subtraction with addition</description>
+        <killingTest>com.example.CalculatorTest.testSubtract</killingTest>
+    </mutation>
+    <mutation detected="false" status="NO_COVERAGE" numberOfTestsRun="0">
+        <sourceFile>Calculator.java</sourceFile>
+        <mutatedClass>com.example.Calculator</mutatedClass>
+        <mutatedMethod>divide</mutatedMethod>
+        <methodDescription>(II)I</methodDescription>
+        <lineNumber>25</lineNumber>
+        <mutator>org.pitest.mutationtest.engine.gregor.mutators.ConditionalsBoundaryMutator</mutator>
+        <description>Changed conditional boundary</description>
+        <killingTest/>
+    </mutation>
+    <mutation detected="true" status="KILLED" numberOfTestsRun="2">
+        <sourceFile>Validator.java</sourceFile>
+        <mutatedClass>com.example.Validator</mutatedClass>
+        <mutatedMethod>isValid</mutatedMethod>
+        <methodDescription>(Ljava/lang/String;)Z</methodDescription>
+        <lineNumber>8</lineNumber>
+        <mutator>org.pitest.mutationtest.engine.gregor.mutators.NegateConditionalsMutator</mutator>
+        <description>negated conditional</description>
+        <killingTest>com.example.ValidatorTest.testIsValid</killingTest>
+    </mutation>
+    <mutation detected="false" status="SURVIVED" numberOfTestsRun="1">
+        <sourceFile>Validator.java</sourceFile>
+        <mutatedClass>com.example.Validator</mutatedClass>
+        <mutatedMethod>isValid</mutatedMethod>
+        <methodDescription>(Ljava/lang/String;)Z</methodDescription>
+        <lineNumber>12</lineNumber>
+        <mutator>org.pitest.mutationtest.engine.gregor.mutators.FalseReturnValsMutator</mutator>
+        <description>replaced boolean return with false</description>
+        <killingTest/>
+    </mutation>
+</mutations>
