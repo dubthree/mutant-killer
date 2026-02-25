@@ -5,6 +5,7 @@ import io.github.dubthree.mutantkiller.analysis.MutantAnalyzer;
 import io.github.dubthree.mutantkiller.codegen.TestImprovement;
 import io.github.dubthree.mutantkiller.codegen.TestImprover;
 import io.github.dubthree.mutantkiller.config.MutantKillerConfig;
+import static io.github.dubthree.mutantkiller.config.MutantKillerConfig.DEFAULT_MODEL;
 import io.github.dubthree.mutantkiller.git.GitProvider;
 import io.github.dubthree.mutantkiller.git.RepositoryManager;
 import io.github.dubthree.mutantkiller.build.BuildExecutor;
@@ -35,7 +36,7 @@ public class RunCommand implements Callable<Integer> {
     @Option(names = {"-b", "--base-branch"}, description = "Base branch to work from", defaultValue = "main")
     private String baseBranch;
 
-    @Option(names = {"--model"}, description = "LLM model to use", defaultValue = "claude-sonnet-4-20250514")
+    @Option(names = {"--model"}, description = "LLM model to use", defaultValue = DEFAULT_MODEL)
     private String model;
 
     @Option(names = {"--max-mutants"}, description = "Maximum mutants to process", defaultValue = "10")
@@ -53,15 +54,21 @@ public class RunCommand implements Callable<Integer> {
     @Option(names = {"-v", "--verbose"}, description = "Verbose output")
     private boolean verbose;
 
-    @Option(names = {"--github-token"}, description = "GitHub token (or set GITHUB_TOKEN env var)")
-    private String githubToken;
+    @Option(names = {"--token", "--github-token"}, description = "Git provider token (or set GIT_TOKEN / GITHUB_TOKEN env var)")
+    private String gitToken;
 
     @Override
     public Integer call() throws Exception {
-        // Resolve GitHub token
-        String token = githubToken != null ? githubToken : System.getenv("GITHUB_TOKEN");
+        // Resolve git provider token: CLI flag, then GIT_TOKEN, then GITHUB_TOKEN
+        String token = gitToken;
         if (token == null || token.isBlank()) {
-            System.err.println("GitHub token required. Set --github-token or GITHUB_TOKEN env var.");
+            token = System.getenv("GIT_TOKEN");
+        }
+        if (token == null || token.isBlank()) {
+            token = System.getenv("GITHUB_TOKEN");
+        }
+        if (token == null || token.isBlank()) {
+            System.err.println("Git provider token required. Set --token, GIT_TOKEN, or GITHUB_TOKEN env var.");
             return 1;
         }
 
@@ -129,7 +136,7 @@ public class RunCommand implements Callable<Integer> {
         System.out.println("  Processing: " + survived.size() + " mutants");
 
         if (survived.isEmpty()) {
-            System.out.println("\nNo surviving mutants! Your tests are strong. 💪");
+            System.out.println("\nNo surviving mutants! Your tests are strong.");
             return 0;
         }
 
@@ -257,12 +264,7 @@ public class RunCommand implements Callable<Integer> {
     }
 
     private String extractRepoName(String url) {
-        String name = url.replaceAll("\\.git$", "");
-        int lastSlash = name.lastIndexOf('/');
-        if (lastSlash >= 0) {
-            name = name.substring(lastSlash + 1);
-        }
-        return name;
+        return RepositoryManager.extractRepoName(url);
     }
 
     private String buildPrBody(MutationResult mutant, MutantAnalysis analysis, TestImprovement improvement) {

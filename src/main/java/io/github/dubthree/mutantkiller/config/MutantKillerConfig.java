@@ -16,6 +16,8 @@ public record MutantKillerConfig(
     boolean dryRun,
     boolean verbose
 ) {
+    public static final String DEFAULT_MODEL = "claude-sonnet-4-20250514";
+
     public static Builder builder() {
         return new Builder();
     }
@@ -31,25 +33,38 @@ public record MutantKillerConfig(
                 try {
                     return Files.readString(customPrompt);
                 } catch (IOException e) {
-                    // Fall through to default
+                    System.err.println("Warning: could not read custom prompt " + customPrompt + ": " + e.getMessage());
                 }
             }
         }
-        
+
         // Load from classpath
         try (var stream = getClass().getResourceAsStream("/prompts/" + name + ".md")) {
             if (stream != null) {
                 return new String(stream.readAllBytes());
             }
         } catch (IOException e) {
-            // Fall through to hardcoded default
+            // Fall through to null
         }
-        
+
         return null;
     }
 
+    /**
+     * Returns a string representation that excludes the API key.
+     */
+    @Override
+    public String toString() {
+        return "MutantKillerConfig[model=" + model
+            + ", sourceDir=" + sourceDir
+            + ", testDir=" + testDir
+            + ", promptDir=" + promptDir
+            + ", dryRun=" + dryRun
+            + ", verbose=" + verbose + "]";
+    }
+
     public static class Builder {
-        private String model = "claude-sonnet-4-20250514";
+        private String model = DEFAULT_MODEL;
         private String apiKey;
         private Path sourceDir;
         private Path testDir;

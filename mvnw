@@ -15,6 +15,12 @@ BASE_DIR=$(cd "$(dirname "$0")" && pwd)
 WRAPPER_JAR="$BASE_DIR/.mvn/wrapper/maven-wrapper.jar"
 WRAPPER_PROPERTIES="$BASE_DIR/.mvn/wrapper/maven-wrapper.properties"
 
+# Read distribution URL from properties
+if [ -f "$WRAPPER_PROPERTIES" ]; then
+    DIST_URL=$(sed -n 's/^distributionUrl=//p' "$WRAPPER_PROPERTIES" | tr -d '\r')
+fi
+DIST_URL="${DIST_URL:-https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.9.6/apache-maven-3.9.6-bin.zip}"
+
 # Download wrapper JAR if missing
 if [ ! -f "$WRAPPER_JAR" ]; then
     echo "Downloading Maven Wrapper..."
@@ -30,5 +36,7 @@ if [ ! -f "$WRAPPER_JAR" ]; then
 fi
 
 exec "$JAVA_CMD" \
-    -jar "$WRAPPER_JAR" \
+    -classpath "$WRAPPER_JAR" \
+    "-Dmaven.multiModuleProjectDirectory=$BASE_DIR" \
+    org.apache.maven.wrapper.MavenWrapperMain \
     "$@"

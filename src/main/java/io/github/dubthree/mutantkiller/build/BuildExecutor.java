@@ -56,6 +56,25 @@ public abstract class BuildExecutor {
     public abstract Path testDir();
 
     /**
+     * Recursively search for mutations.xml in a directory.
+     */
+    protected File findMutationsXml(File dir) {
+        File[] files = dir.listFiles();
+        if (files == null) return null;
+
+        for (File file : files) {
+            if (file.getName().equals("mutations.xml")) {
+                return file;
+            }
+            if (file.isDirectory()) {
+                File found = findMutationsXml(file);
+                if (found != null) return found;
+            }
+        }
+        return null;
+    }
+
+    /**
      * Execute a command in the project directory.
      */
     protected int execute(List<String> command, boolean verbose) throws IOException, InterruptedException {
@@ -143,22 +162,6 @@ public abstract class BuildExecutor {
         public Path testDir() {
             return projectDir.resolve("src/test/java");
         }
-
-        private File findMutationsXml(File dir) {
-            File[] files = dir.listFiles();
-            if (files == null) return null;
-            
-            for (File file : files) {
-                if (file.getName().equals("mutations.xml")) {
-                    return file;
-                }
-                if (file.isDirectory()) {
-                    File found = findMutationsXml(file);
-                    if (found != null) return found;
-                }
-            }
-            return null;
-        }
     }
 
     /**
@@ -216,22 +219,6 @@ public abstract class BuildExecutor {
         @Override
         public Path testDir() {
             return projectDir.resolve("src/test/java");
-        }
-
-        private File findMutationsXml(File dir) {
-            File[] files = dir.listFiles();
-            if (files == null) return null;
-            
-            for (File file : files) {
-                if (file.getName().equals("mutations.xml")) {
-                    return file;
-                }
-                if (file.isDirectory()) {
-                    File found = findMutationsXml(file);
-                    if (found != null) return found;
-                }
-            }
-            return null;
         }
     }
 }
