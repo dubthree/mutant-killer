@@ -3,88 +3,161 @@ package io.github.dubthree.mutantkiller.git;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
- * Manages git operations: clone, branch, commit, push.
+ * Plain git operations: clone, branch, commit, push. Authentication is passed per command as an
+ * HTTP header, so the token never lands in {@code .git/config}.
  */
 public class RepositoryManager {
 
     private final Path workDir;
-    private final String token;
+    private final GitCredentials credentials; // may be null for public read-only access
     private Path repoPath;
+    private String remoteUrl;
 
-    public RepositoryManager(Path workDir, String token) {
+    public RepositoryManager(Path workDir, GitCredentials credentials) {
         this.workDir = workDir;
-        this.token = token;
+        this.credentials = credentials;
     }
 
     /**
-     * Clone a repository or update it if it already exists.
+     * Clone the repository, or fetch and hard-reset it when it is already there.
+     *
+     * @param branch branch to check out, or null for the remote's default branch
+     * @return the clone's path
      */
     public Path cloneOrUpdate(String repoUrl, String branch) throws IOException, InterruptedException {
-        // Create work directory
         Files.createDirectories(workDir);
-        
-        // Extract repo name from URL
-        String repoName = extractRepoName(repoUrl);
-        repoPath = workDir.resolve(repoName);
+        remoteUrl = GitProvider.toHttps(repoUrl);
+        repoPath = workDir.resolve(extractRepoName(repoUrl));
 
         if (Files.exists(repoPath.resolve(".git"))) {
-            // Repository exists, fetch and reset
-            git("fetch", "origin");
-            git("checkout", branch);
+            git(withAuth("fetch", "origin", "--prune"));
+            if (branch == null) {
+                branch = defaultBranch();
+            }
+            git("checkout", "-f", branch);
             git("reset", "--hard", "origin/" + branch);
             git("clean", "-fd");
         } else {
-            // Clone fresh - use provider-agnostic auth injection
-            String authUrl = GitProvider.injectAuth(repoUrl, token);
-            gitInDir(workDir, "clone", "--branch", branch, authUrl, repoName);
+            List<String> args = new ArrayList<>(List.of("clone"));
+            if (branch != null) {
+                args.add("--branch");
+                args.add(branch);
+            }
+            args.add(remoteUrl);
+            args.add(repoPath.getFileName().toString());
+            gitInDir(workDir, withAuth(args.toArray(new String[0])));
         }
-
         return repoPath;
     }
 
     /**
-     * Create a new branch from the specified base.
+     * Name of the checked out branch.
      */
+    public String currentBranch() throws IOException, InterruptedException {
+        return git("rev-parse", "--abbrev-ref", "HEAD").strip();
+    }
+
+    /**
+     * The remote's default branch (what {@code origin/HEAD} points at), falling back to the
+     * current branch.
+     */
+    public String defaultBranch() throws IOException, InterruptedException {
+        try {
+            String ref = git("symbolic-ref", "--short", "refs/remotes/origin/HEAD").strip();
+            return ref.startsWith("origin/") ? ref.substring("origin/".length()) : ref;
+        } catch (IOException e) {
+            try {
+                String out = git("remote", "show", "origin");
+                Matcher m = Pattern.compile("HEAD branch:\\s*(\\S+)").matcher(out);
+                if (m.find()) {
+                    return m.group(1);
+                }
+            } catch (IOException ignored) {
+                // fall through
+            }
+            return currentBranch();
+        }
+    }
+
     public void createBranch(String branchName, String baseBranch) throws IOException, InterruptedException {
-        git("checkout", baseBranch);
+        git("checkout", "-f", baseBranch);
         git("checkout", "-B", branchName);
     }
 
-    /**
-     * Checkout a branch.
-     */
     public void checkout(String branch) throws IOException, InterruptedException {
-        git("checkout", branch);
+        git("checkout", "-f", branch);
     }
 
     /**
-     * Commit all changes and push to remote.
+     * Discard uncommitted changes to tracked files and remove untracked files, except the
+     * given paths which are kept as they are.
      */
-    public void commitAndPush(String branch, String message) throws IOException, InterruptedException {
-        git("add", "-A");
-        git("commit", "-m", message);
-        git("push", "-u", "origin", branch, "--force");
+    public void discardChanges() throws IOException, InterruptedException {
+        git("checkout", "--", ".");
+        git("clean", "-fd");
     }
 
     /**
-     * Get the current repository path.
+     * Commit only the given files and push the branch.
      */
+    public void commitAndPush(String branch, String message, List<Path> files) throws IOException, InterruptedException {
+        List<String> add = new ArrayList<>(List.of("add", "--"));
+        for (Path f : files) {
+            add.add(repoPath.relativize(f.toAbsolutePath()).toString());
+        }
+        git(add.toArray(new String[0]));
+        List<String> commit = new ArrayList<>();
+        if (gitQuiet("config", "--get", "user.email").isBlank()) {
+            commit.addAll(List.of("-c", "user.name=mutant-killer", "-c", "user.email=mutant-killer@users.noreply.github.com"));
+        }
+        commit.addAll(List.of("commit", "-m", message));
+        git(commit.toArray(new String[0]));
+        git(withAuth("push", "-u", "origin", branch, "--force"));
+    }
+
     public Path getRepoPath() {
         return repoPath;
     }
 
-    private void git(String... args) throws IOException, InterruptedException {
-        gitInDir(repoPath, args);
+    private String[] withAuth(String... args) {
+        if (credentials == null || credentials.token() == null || credentials.token().isBlank()) {
+            return args;
+        }
+        List<String> all = new ArrayList<>();
+        all.add("-c");
+        all.add("http." + hostPrefix(remoteUrl) + ".extraheader=" + credentials.basicAuthHeader());
+        all.addAll(List.of(args));
+        return all.toArray(new String[0]);
     }
 
-    private void gitInDir(Path dir, String... args) throws IOException, InterruptedException {
+    static String hostPrefix(String url) {
+        Matcher m = Pattern.compile("^(https?://[^/]+/)").matcher(url);
+        return m.find() ? m.group(1) : url;
+    }
+
+    private String git(String... args) throws IOException, InterruptedException {
+        return gitInDir(repoPath, args);
+    }
+
+    private String gitQuiet(String... args) throws InterruptedException {
+        try {
+            return gitInDir(repoPath, args);
+        } catch (IOException e) {
+            return "";
+        }
+    }
+
+    private String gitInDir(Path dir, String... args) throws IOException, InterruptedException {
         List<String> command = new ArrayList<>();
         command.add("git");
         command.addAll(List.of(args));
@@ -92,40 +165,43 @@ public class RepositoryManager {
         ProcessBuilder pb = new ProcessBuilder(command);
         pb.directory(dir.toFile());
         pb.redirectErrorStream(true);
-        
-        // Set up credential helper for token auth
-        pb.environment().put("GIT_ASKPASS", "echo");
         pb.environment().put("GIT_TERMINAL_PROMPT", "0");
 
         Process process = pb.start();
-        
         StringBuilder output = new StringBuilder();
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
             String line;
             while ((line = reader.readLine()) != null) {
-                output.append(line).append("\n");
+                output.append(line).append('\n');
             }
         }
-
-        boolean finished = process.waitFor(5, TimeUnit.MINUTES);
-        if (!finished) {
+        if (!process.waitFor(10, TimeUnit.MINUTES)) {
             process.destroyForcibly();
-            throw new IOException("Git command timed out: " + String.join(" ", args));
+            throw new IOException("Git command timed out: git " + mask(String.join(" ", args)));
         }
-
         if (process.exitValue() != 0) {
-            throw new IOException("Git command failed: " + String.join(" ", args) + "\n" + output);
+            throw new IOException("git " + mask(String.join(" ", args)) + " failed:\n" + mask(output.toString()));
         }
+        return output.toString();
     }
 
-    private String extractRepoName(String url) {
-        // Extract repo name from URL
-        String name = url.replaceAll("\\.git$", "");
-        int lastSlash = name.lastIndexOf('/');
+    /**
+     * Hide the credential header and token in anything that reaches logs.
+     */
+    String mask(String text) {
+        if (credentials == null || credentials.token() == null || credentials.token().isBlank()) {
+            return text;
+        }
+        return text.replace(credentials.basicAuthHeader(), "AUTHORIZATION: basic ***")
+            .replace(credentials.token(), "***");
+    }
+
+    public static String extractRepoName(String url) {
+        String name = url.replaceAll("/+$", "").replaceAll("\\.git$", "");
+        int lastSlash = Math.max(name.lastIndexOf('/'), name.lastIndexOf(':'));
         if (lastSlash >= 0) {
             name = name.substring(lastSlash + 1);
         }
-        return name;
+        return name.isBlank() ? "repo" : name;
     }
-
 }

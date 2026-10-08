@@ -1,55 +1,44 @@
 package io.github.dubthree.mutantkiller.analysis;
 
+import io.github.dubthree.mutantkiller.build.TestFramework;
 import io.github.dubthree.mutantkiller.pit.MutationResult;
 
 import java.nio.file.Path;
 
 /**
- * Contains all the context needed to understand and fix a surviving mutation.
+ * Everything the model needs to know about one surviving mutation.
+ *
+ * @param mutation              the PIT mutation
+ * @param sourceFile            file that declares the mutated (outer) class
+ * @param sourceCode            full text of that file
+ * @param methodSource          text of the mutated method, or null when it could not be located
+ * @param contextAroundMutation a few lines around the mutated line, with a {@code >>>} marker
+ * @param testFile              test file to extend (may not exist yet)
+ * @param testClassFqn          fully qualified name of that test class
+ * @param existingTestCode      current text of the test file, or null when it does not exist
+ * @param testFramework         framework the test must use
  */
 public record MutantAnalysis(
     MutationResult mutation,
     Path sourceFile,
     String sourceCode,
-    String mutatedMethod,
+    String methodSource,
     String contextAroundMutation,
     Path testFile,
-    String existingTestCode
+    String testClassFqn,
+    String existingTestCode,
+    TestFramework testFramework
 ) {
-    /**
-     * Returns true if we have an existing test file to improve.
-     */
     public boolean hasExistingTest() {
-        return testFile != null && existingTestCode != null;
+        return existingTestCode != null;
     }
 
-    /**
-     * Builds a prompt for the LLM to understand the mutation.
-     */
-    public String buildAnalysisPrompt() {
-        StringBuilder prompt = new StringBuilder();
-        prompt.append("A mutation testing tool (PIT) found a surviving mutation in this Java code.\n\n");
-        prompt.append("## Mutation Details\n");
-        prompt.append("- Class: ").append(mutation.mutatedClass()).append("\n");
-        prompt.append("- Method: ").append(mutation.mutatedMethod()).append("\n");
-        prompt.append("- Line: ").append(mutation.lineNumber()).append("\n");
-        prompt.append("- Mutation type: ").append(mutation.getMutatorDescription()).append("\n");
-        prompt.append("\n## Code Context (>>> marks the mutated line)\n```java\n");
-        prompt.append(contextAroundMutation);
-        prompt.append("```\n\n");
-        
-        if (mutatedMethod != null) {
-            prompt.append("## Full Method\n```java\n");
-            prompt.append(mutatedMethod);
-            prompt.append("\n```\n\n");
-        }
+    public String testSimpleName() {
+        return testClassFqn.substring(testClassFqn.lastIndexOf('.') + 1);
+    }
 
-        if (hasExistingTest()) {
-            prompt.append("## Existing Test Class\n```java\n");
-            prompt.append(existingTestCode);
-            prompt.append("\n```\n\n");
-        }
-
-        return prompt.toString();
+    public String testPackage() {
+        int dot = testClassFqn.lastIndexOf('.');
+        return dot >= 0 ? testClassFqn.substring(0, dot) : "";
     }
 }

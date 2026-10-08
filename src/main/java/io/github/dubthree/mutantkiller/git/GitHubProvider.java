@@ -35,6 +35,11 @@ public class GitHubProvider implements GitProvider {
     }
 
     @Override
+    public String gitUsername() {
+        return "x-access-token";
+    }
+
+    @Override
     public String name() {
         return "GitHub";
     }

@@ -1,119 +1,78 @@
 package io.github.dubthree.mutantkiller.git;
 
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 /**
- * Interface for git hosting provider operations (PRs, etc.).
- * Git operations (clone, push, branch) are provider-agnostic and handled by RepositoryManager.
+ * Hosting provider operations (pull requests, comments). Plain git operations are provider
+ * agnostic and live in {@link RepositoryManager}.
  */
 public interface GitProvider {
 
     /**
      * Create a pull/merge request.
      *
-     * @param headBranch Source branch with changes
-     * @param baseBranch Target branch to merge into
-     * @param title PR title
-     * @param body PR description (markdown)
-     * @return URL of the created PR
+     * @return URL of the created (or already existing) PR
      */
-    String createPullRequest(String headBranch, String baseBranch, String title, String body) 
-            throws Exception;
+    String createPullRequest(String headBranch, String baseBranch, String title, String body) throws Exception;
 
     /**
      * Add a comment to a PR/MR.
-     *
-     * @param prId PR identifier (number for GitHub, IID for GitLab, etc.)
-     * @param comment Comment text
      */
     void addComment(String prId, String comment) throws Exception;
 
-    /**
-     * Get the name of this provider.
-     */
     String name();
 
     /**
-     * Detect the appropriate provider from a repository URL.
+     * User name to pair with a token for HTTP basic auth against this provider's git endpoint.
+     */
+    String gitUsername();
+
+    /**
+     * Detect the provider from a repository URL. {@code token} may be null for read-only use.
      */
     static GitProvider detect(String repoUrl, String token) {
         if (repoUrl == null) {
             throw new IllegalArgumentException("Repository URL cannot be null");
         }
-
         String lowerUrl = repoUrl.toLowerCase();
 
-        // GitHub
         if (lowerUrl.contains("github.com")) {
             RepoInfo info = parseGitHubUrl(repoUrl);
             return new GitHubProvider(token, info.owner(), info.repo());
         }
-
-        // GitLab (gitlab.com or self-hosted)
-        if (lowerUrl.contains("gitlab.com") || lowerUrl.contains("gitlab")) {
-            RepoInfo info = parseGitLabUrl(repoUrl);
-            String baseUrl = extractBaseUrl(repoUrl);
-            return new GitLabProvider(token, baseUrl, info.owner(), info.repo());
-        }
-
-        // Azure DevOps
         if (lowerUrl.contains("dev.azure.com") || lowerUrl.contains("visualstudio.com")) {
             AzureRepoInfo info = parseAzureUrl(repoUrl);
             return new AzureDevOpsProvider(token, info.organization(), info.project(), info.repo());
         }
-
+        if (lowerUrl.contains("gitlab")) {
+            RepoInfo info = parseGitLabUrl(repoUrl);
+            return new GitLabProvider(token, extractBaseUrl(repoUrl), info.owner(), info.repo());
+        }
         throw new IllegalArgumentException("Could not detect git provider from URL: " + repoUrl);
     }
 
     /**
-     * Inject authentication token into repository URL for cloning.
+     * Turn an ssh style URL into https so a token can be used, leaving https URLs untouched.
      */
-    static String injectAuth(String repoUrl, String token) {
-        String lowerUrl = repoUrl.toLowerCase();
-
-        // GitHub: https://x-access-token:TOKEN@github.com/...
-        if (lowerUrl.contains("github.com") && repoUrl.startsWith("https://")) {
-            return repoUrl.replace("https://github.com/", 
-                "https://x-access-token:" + token + "@github.com/");
+    static String toHttps(String repoUrl) {
+        Matcher m = Pattern.compile("^(?:ssh://)?git@([^:/]+)[:/](.+)$").matcher(repoUrl);
+        if (m.matches()) {
+            return "https://" + m.group(1) + "/" + m.group(2);
         }
-
-        // GitLab: https://oauth2:TOKEN@gitlab.com/...
-        if ((lowerUrl.contains("gitlab.com") || lowerUrl.contains("gitlab")) 
-                && repoUrl.startsWith("https://")) {
-            return repoUrl.replaceFirst("https://([^/]+)/", 
-                "https://oauth2:" + token + "@$1/");
-        }
-
-        // Azure DevOps: https://TOKEN@dev.azure.com/...
-        if (lowerUrl.contains("dev.azure.com") && repoUrl.startsWith("https://")) {
-            return repoUrl.replace("https://dev.azure.com/", 
-                "https://" + token + "@dev.azure.com/");
-        }
-        if (lowerUrl.contains("visualstudio.com") && repoUrl.startsWith("https://")) {
-            return repoUrl.replaceFirst("https://([^.]+\\.visualstudio\\.com)/", 
-                "https://" + token + "@$1/");
-        }
-
-        // Fallback - return as-is
         return repoUrl;
     }
 
-    // URL parsing helpers
-
-    private static RepoInfo parseGitHubUrl(String url) {
-        // https://github.com/owner/repo or git@github.com:owner/repo.git
-        var matcher = java.util.regex.Pattern
-            .compile("github\\.com[/:]([^/]+)/([^/\\.]+)")
-            .matcher(url);
+    static RepoInfo parseGitHubUrl(String url) {
+        Matcher matcher = Pattern.compile("github\\.com[/:]([^/]+)/([^/]+?)(?:\\.git)?/?$").matcher(url);
         if (matcher.find()) {
             return new RepoInfo(matcher.group(1), matcher.group(2));
         }
         throw new IllegalArgumentException("Could not parse GitHub URL: " + url);
     }
 
-    private static RepoInfo parseGitLabUrl(String url) {
-        // https://gitlab.com/owner/repo or https://gitlab.company.com/group/subgroup/repo
-        var matcher = java.util.regex.Pattern
-            .compile("https?://[^/]+/(.+?)(?:\\.git)?$")
-            .matcher(url);
+    static RepoInfo parseGitLabUrl(String url) {
+        Matcher matcher = Pattern.compile("(?:https?://[^/]+/|git@[^:]+:)(.+?)(?:\\.git)?/?$").matcher(url);
         if (matcher.find()) {
             String path = matcher.group(1);
             int lastSlash = path.lastIndexOf('/');
@@ -124,30 +83,20 @@ public interface GitProvider {
         throw new IllegalArgumentException("Could not parse GitLab URL: " + url);
     }
 
-    private static AzureRepoInfo parseAzureUrl(String url) {
-        // https://dev.azure.com/org/project/_git/repo
-        // https://org.visualstudio.com/project/_git/repo
-        var matcher = java.util.regex.Pattern
-            .compile("dev\\.azure\\.com/([^/]+)/([^/]+)/_git/([^/\\.]+)")
-            .matcher(url);
+    static AzureRepoInfo parseAzureUrl(String url) {
+        Matcher matcher = Pattern.compile("dev\\.azure\\.com/([^/]+)/([^/]+)/_git/([^/]+?)(?:\\.git)?/?$").matcher(url);
         if (matcher.find()) {
             return new AzureRepoInfo(matcher.group(1), matcher.group(2), matcher.group(3));
         }
-        
-        matcher = java.util.regex.Pattern
-            .compile("([^.]+)\\.visualstudio\\.com/([^/]+)/_git/([^/\\.]+)")
-            .matcher(url);
+        matcher = Pattern.compile("([^./]+)\\.visualstudio\\.com/([^/]+)/_git/([^/]+?)(?:\\.git)?/?$").matcher(url);
         if (matcher.find()) {
             return new AzureRepoInfo(matcher.group(1), matcher.group(2), matcher.group(3));
         }
-        
         throw new IllegalArgumentException("Could not parse Azure DevOps URL: " + url);
     }
 
-    private static String extractBaseUrl(String url) {
-        var matcher = java.util.regex.Pattern
-            .compile("(https?://[^/]+)")
-            .matcher(url);
+    static String extractBaseUrl(String url) {
+        Matcher matcher = Pattern.compile("(https?://[^/]+)").matcher(url);
         if (matcher.find()) {
             return matcher.group(1);
         }
@@ -155,5 +104,6 @@ public interface GitProvider {
     }
 
     record RepoInfo(String owner, String repo) {}
+
     record AzureRepoInfo(String organization, String project, String repo) {}
 }

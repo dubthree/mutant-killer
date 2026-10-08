@@ -37,6 +37,11 @@ public class AzureDevOpsProvider implements GitProvider {
     }
 
     @Override
+    public String gitUsername() {
+        return "";
+    }
+
+    @Override
     public String name() {
         return "Azure DevOps";
     }

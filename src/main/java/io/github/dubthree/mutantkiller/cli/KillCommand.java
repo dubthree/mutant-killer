@@ -1,133 +1,135 @@
 package io.github.dubthree.mutantkiller.cli;
 
 import io.github.dubthree.mutantkiller.analysis.MutantAnalyzer;
+import io.github.dubthree.mutantkiller.build.BuildExecutor;
 import io.github.dubthree.mutantkiller.codegen.TestImprover;
 import io.github.dubthree.mutantkiller.config.MutantKillerConfig;
+import io.github.dubthree.mutantkiller.kill.KillLoop;
+import io.github.dubthree.mutantkiller.kill.KillResult;
+import io.github.dubthree.mutantkiller.llm.LlmClient;
+import io.github.dubthree.mutantkiller.llm.LlmException;
 import io.github.dubthree.mutantkiller.pit.MutationResult;
 import io.github.dubthree.mutantkiller.pit.PitReportParser;
 import picocli.CommandLine.Command;
+import picocli.CommandLine.Mixin;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
 
 import java.io.File;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.concurrent.Callable;
 
 /**
- * The main command - analyzes surviving mutants and generates test improvements.
+ * Kill mutants in a local checkout, starting from an existing PIT report (or running PIT first).
+ * Changes stay in the working tree for you to review and commit.
  */
 @Command(
     name = "kill",
-    description = "Analyze surviving mutants and generate improved tests to kill them"
+    description = "Generate and verify tests that kill surviving mutants in a local project (no git, no PRs)"
 )
 public class KillCommand implements Callable<Integer> {
 
-    @Parameters(index = "0", description = "Path to PIT mutations.xml report")
+    @Parameters(index = "0", arity = "0..1", description = "PIT mutations.xml report. Omitted: PIT is run first.")
     private File reportFile;
 
-    @Option(names = {"-s", "--source"}, description = "Source directory", required = true)
-    private File sourceDir;
+    @Option(names = {"-p", "--project"}, description = "Project directory (default: current directory)", defaultValue = ".")
+    private File projectDir;
 
-    @Option(names = {"-t", "--test"}, description = "Test source directory", required = true)
-    private File testDir;
-
-    @Option(names = {"--model"}, description = "LLM model to use", defaultValue = "claude-sonnet-4-20250514")
-    private String model;
-
-    @Option(names = {"--dry-run"}, description = "Show proposed changes without applying")
+    @Option(names = {"--dry-run"}, description = "Only show the generated tests; do not write, build or verify")
     private boolean dryRun;
 
-    @Option(names = {"--max-mutants"}, description = "Maximum number of mutants to process", defaultValue = "10")
-    private int maxMutants;
-
-    @Option(names = {"-v", "--verbose"}, description = "Verbose output")
-    private boolean verbose;
+    @Mixin
+    private KillOptions options;
 
     @Override
     public Integer call() throws Exception {
-        // Validate inputs
-        if (!reportFile.exists()) {
+        Path project = projectDir.toPath().toAbsolutePath().normalize();
+        if (!java.nio.file.Files.isDirectory(project)) {
+            System.err.println("Project directory not found: " + project);
+            return 1;
+        }
+        if (reportFile != null && !reportFile.exists()) {
             System.err.println("Report file not found: " + reportFile);
             return 1;
         }
-        if (!sourceDir.isDirectory()) {
-            System.err.println("Source directory not found: " + sourceDir);
+
+        MutantKillerConfig config = options.toConfig(dryRun);
+        LlmClient llm;
+        try {
+            llm = LlmClient.create(config);
+        } catch (LlmException e) {
+            System.err.println(e.getMessage());
             return 1;
         }
-        if (!testDir.isDirectory()) {
-            System.err.println("Test directory not found: " + testDir);
+
+        Path logDir = project.resolve("target").resolve("mutant-killer-logs");
+        BuildExecutor build = BuildExecutor.detect(project, options.buildSystem, config.buildTimeout(), config.verbose(), logDir);
+        if (build == null) {
+            System.err.println("Could not detect a Maven or Gradle build in " + project);
             return 1;
         }
 
-        // Load config
-        MutantKillerConfig config = MutantKillerConfig.builder()
-            .model(model)
-            .sourceDir(sourceDir.toPath())
-            .testDir(testDir.toPath())
-            .dryRun(dryRun)
-            .verbose(verbose)
-            .build();
-
-        // Parse report
-        System.out.println("Parsing PIT report...");
-        PitReportParser parser = new PitReportParser();
-        List<MutationResult> mutations = parser.parse(reportFile);
-
-        List<MutationResult> survived = mutations.stream()
-            .filter(MutationResult::survived)
-            .limit(maxMutants)
-            .toList();
-
-        if (survived.isEmpty()) {
-            System.out.println("No surviving mutants found. Your tests are strong!");
-            return 0;
-        }
-
-        System.out.println("Found " + survived.size() + " surviving mutants to kill.");
-        System.out.println();
-
-        // Analyze and improve
-        MutantAnalyzer analyzer = new MutantAnalyzer(config);
-        TestImprover improver = new TestImprover(config);
-
-        int killed = 0;
-        for (MutationResult mutant : survived) {
-            System.out.println("=== Processing mutant in " + mutant.mutatedClass() + " ===");
-            System.out.println("Method: " + mutant.mutatedMethod() + " (line " + mutant.lineNumber() + ")");
-            System.out.println("Mutator: " + mutant.mutator());
-            
-            try {
-                var analysis = analyzer.analyze(mutant);
-                var improvement = improver.improve(mutant, analysis);
-                
-                if (improvement.isPresent()) {
-                    if (dryRun) {
-                        System.out.println("Proposed change:");
-                        System.out.println(improvement.get().diff());
-                    } else {
-                        improvement.get().apply();
-                        System.out.println("Applied test improvement.");
-                    }
-                    killed++;
-                } else {
-                    System.out.println("Could not generate improvement for this mutant.");
-                }
-            } catch (Exception e) {
-                System.err.println("Error processing mutant: " + e.getMessage());
-                if (verbose) {
-                    e.printStackTrace();
-                }
+        RunReport report = new RunReport(project.toString(), llm.name(), llm.model());
+        try (llm) {
+            String note = build.prepare();
+            if (note != null) {
+                System.out.println("Note: " + note);
             }
-            System.out.println();
+
+            List<MutationResult> mutations;
+            if (reportFile != null) {
+                mutations = new PitReportParser().parse(reportFile);
+            } else {
+                System.out.println("Running PIT (" + build.name() + ")...");
+                mutations = new PitReportParser().parseAll(build.runMutationTesting(options.targetClasses, options.targetTests));
+            }
+            report.pitStats(mutations);
+            List<MutationResult> selected = MutantSelector.select(mutations, options.includeNoCoverage, options.maxMutants);
+            System.out.printf("Mutants: %d total, %d survived, %d no coverage; processing %d%n",
+                mutations.size(), MutantSelector.count(mutations, "SURVIVED"),
+                MutantSelector.count(mutations, "NO_COVERAGE"), selected.size());
+            if (selected.isEmpty()) {
+                System.out.println("No surviving mutants found. Your tests are strong!");
+                return 0;
+            }
+
+            MutantAnalyzer analyzer = new MutantAnalyzer(build.sourceRoots(), build.testRoots(), build.detectTestFramework());
+            TestImprover improver = new TestImprover(config, llm);
+            KillLoop loop = new KillLoop(config, build, analyzer, improver, line -> System.out.println("  " + line));
+
+            int i = 0;
+            for (MutationResult mutant : selected) {
+                i++;
+                System.out.println();
+                System.out.printf("--- Mutant %d/%d: %s ---%n", i, selected.size(), mutant.humanReadable());
+                if (dryRun) {
+                    var analysis = analyzer.analyze(mutant);
+                    var response = improver.generate(analysis, List.of());
+                    var generated = io.github.dubthree.mutantkiller.codegen.GeneratedTest.parse(response.text());
+                    System.out.println("Proposed addition to " + analysis.testClassFqn() + ":");
+                    System.out.println(generated.rawCode());
+                    continue;
+                }
+                KillResult result = loop.kill(mutant);
+                System.out.println("  => " + result.status() + ": " + result.message());
+                if (result.success()) {
+                    System.out.println("  changed: " + result.testFile());
+                }
+                report.add(result, null);
+            }
+        } finally {
+            build.cleanup();
         }
 
-        System.out.println("=== Summary ===");
-        System.out.println("Processed: " + survived.size() + " mutants");
-        System.out.println("Improvements: " + killed);
-        if (dryRun) {
-            System.out.println("(dry run - no changes applied)");
+        if (!dryRun) {
+            report.printSummary(false);
+            if (options.report != null) {
+                report.write(options.report);
+                System.out.println("Report written to " + options.report);
+            }
+            System.out.println("Review the changes with `git diff` in " + project);
         }
-
         return 0;
     }
 }
