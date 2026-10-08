@@ -46,6 +46,8 @@ public record KillResult(
         FAILED,
         /** The model judged the mutant equivalent (no observable behaviour change), so no test can kill it. */
         EQUIVALENT,
+        /** The model judged that killing the mutant would need an unreasonable test (huge inputs, timing, reflection). */
+        UNTESTABLE,
         /** Could not even try: source/test file not found, build broken, model unavailable. */
         ERROR
     }

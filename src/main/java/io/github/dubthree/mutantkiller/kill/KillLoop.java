@@ -86,10 +86,12 @@ public class KillLoop {
                 response.inputTokens(), response.outputTokens(),
                 response.hasCost() ? String.format(", $%.4f", response.costUsd()) : ""));
 
-            if (isEquivalentVerdict(response.text())) {
-                log.accept("  model judged the mutant equivalent; stopping");
-                return new KillResult(mutant, KillResult.Status.EQUIVALENT, attempt, null, analysis.testClassFqn(), lastCode,
-                    "Judged equivalent by the model: " + firstLine(explanation(response.text())),
+            KillResult.Status modelVerdict = verdictOf(response.text());
+            if (modelVerdict != null) {
+                log.accept("  model verdict: " + modelVerdict + "; stopping");
+                return new KillResult(mutant, modelVerdict, attempt, null, analysis.testClassFqn(), lastCode,
+                    (modelVerdict == KillResult.Status.EQUIVALENT ? "Judged equivalent by the model: " : "Judged not worth a test by the model: ")
+                        + firstLine(explanation(response.text())),
                     history, inTokens, outTokens, costKnown ? cost : Double.NaN, Duration.between(start, Instant.now()));
             }
 
@@ -217,20 +219,35 @@ public class KillLoop {
     }
 
     /**
-     * The reply starts with the word EQUIVALENT (optionally after whitespace or markdown emphasis).
+     * A reply that starts with EQUIVALENT or UNTESTABLE (optionally after markdown emphasis) and
+     * carries no code block is a verdict rather than a test.
+     *
+     * @return the matching status, or null when the reply is a normal answer
      */
-    static boolean isEquivalentVerdict(String reply) {
+    static KillResult.Status verdictOf(String reply) {
         if (reply == null) {
-            return false;
+            return null;
         }
         String head = reply.strip().replaceAll("^[*_`#\\s]+", "");
-        return head.regionMatches(true, 0, "EQUIVALENT", 0, "EQUIVALENT".length())
-            && !head.contains("```");
+        if (head.contains("```")) {
+            return null;
+        }
+        if (head.regionMatches(true, 0, "EQUIVALENT", 0, "EQUIVALENT".length())) {
+            return KillResult.Status.EQUIVALENT;
+        }
+        if (head.regionMatches(true, 0, "UNTESTABLE", 0, "UNTESTABLE".length())) {
+            return KillResult.Status.UNTESTABLE;
+        }
+        return null;
+    }
+
+    static boolean isEquivalentVerdict(String reply) {
+        return verdictOf(reply) == KillResult.Status.EQUIVALENT;
     }
 
     private static String explanation(String reply) {
         String head = reply.strip().replaceAll("^[*_`#\\s]+", "");
-        String rest = head.substring("EQUIVALENT".length()).strip();
+        String rest = head.substring("EQUIVALENT".length()).strip(); // both keywords are 10 chars
         return rest.replaceAll("^[:*_.\\-\\s]+", "");
     }
 

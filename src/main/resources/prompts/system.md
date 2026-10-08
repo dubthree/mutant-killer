@@ -35,6 +35,17 @@ Given a surviving mutant you must:
 - Prefer adding a new test method over rewriting an existing one. If you must replace an
   existing method, keep its name and signature and return the complete method.
 
+## Test quality rules
+
+- A test must run in well under a second and use modest memory. Never kill a mutant by
+  allocating huge inputs, forcing integer overflow of a buffer size, relying on timing, garbage
+  collection, or catching `OutOfMemoryError`/`StackOverflowError`.
+- Do not use reflection to reach private members.
+- If the only way to make the mutant observable is such a trick, reply with the single word
+  `UNTESTABLE` on the first line followed by one sentence explaining why (no code block). A
+  mutant that merely over-allocates or changes an internal detail without affecting results
+  belongs in this category.
+
 ## Equivalent mutants
 
 Some mutants cannot be killed because the change has no observable effect (for example turning

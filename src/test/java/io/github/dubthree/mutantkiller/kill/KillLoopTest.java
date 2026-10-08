@@ -258,6 +258,17 @@ class KillLoopTest {
         assertTrue(KillLoop.isEquivalentVerdict("EQUIVALENT - no behaviour change"));
         assertTrue(KillLoop.isEquivalentVerdict("  equivalent: same result"));
         assertFalse(KillLoop.isEquivalentVerdict(null));
+        assertEquals(KillResult.Status.UNTESTABLE, KillLoop.verdictOf("UNTESTABLE: would need a 1GB input"));
+        assertNull(KillLoop.verdictOf("```java\nvoid x() {}\n```"));
+    }
+
+    @Test
+    void untestableVerdictStopsEarly() {
+        llm.replies.add("UNTESTABLE: only observable through a 2^30-char input.");
+        KillResult r = loop.kill(MUTANT);
+        assertEquals(KillResult.Status.UNTESTABLE, r.status());
+        assertTrue(r.message().contains("2^30"), r.message());
+        assertTrue(build.testRunsSeen.isEmpty());
     }
 
     @Test

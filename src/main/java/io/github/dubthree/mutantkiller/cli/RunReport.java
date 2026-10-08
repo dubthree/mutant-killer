@@ -95,6 +95,7 @@ final class RunReport {
         long failed = results.stream().filter(r -> r.status() == KillResult.Status.FAILED).count();
         long errors = results.stream().filter(r -> r.status() == KillResult.Status.ERROR).count();
         long equivalent = results.stream().filter(r -> r.status() == KillResult.Status.EQUIVALENT).count();
+        long untestable = results.stream().filter(r -> r.status() == KillResult.Status.UNTESTABLE).count();
         System.out.println("Killed (verified by PIT): " + verified);
         if (unverified > 0) {
             System.out.println("Tests pass (unverified):  " + unverified);
@@ -102,6 +103,9 @@ final class RunReport {
         System.out.println("Failed after retries:     " + failed);
         if (equivalent > 0) {
             System.out.println("Judged equivalent:        " + equivalent);
+        }
+        if (untestable > 0) {
+            System.out.println("Judged untestable:        " + untestable);
         }
         System.out.println("Errors:                   " + errors);
         long prs = extra.values().stream().filter(v -> v.startsWith("http")).count();
