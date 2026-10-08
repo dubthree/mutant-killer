@@ -13,7 +13,7 @@ import picocli.CommandLine.Command;
 @Command(
     name = "mutant-killer",
     mixinStandardHelpOptions = true,
-    version = "0.1.0",
+    version = "0.2.0",
     description = "Autonomous agent that kills surviving mutants by improving your tests.",
     subcommands = {
         RunCommand.class,

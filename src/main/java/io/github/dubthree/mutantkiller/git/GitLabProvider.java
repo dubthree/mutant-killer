@@ -36,6 +36,11 @@ public class GitLabProvider implements GitProvider {
     }
 
     @Override
+    public String gitUsername() {
+        return "oauth2";
+    }
+
+    @Override
     public String name() {
         return "GitLab";
     }

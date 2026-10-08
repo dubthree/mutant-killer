@@ -1,14 +1,16 @@
-# Mutation Analysis
+# Mutation analysis
 
 A mutation testing tool (PIT) found a surviving mutation in this Java code.
 
-## Mutation Details
-- **Class:** {{mutatedClass}}
-- **Method:** {{mutatedMethod}}
-- **Line:** {{lineNumber}}
-- **Mutation type:** {{mutatorDescription}}
+## Mutation details
 
-## Code Context
+- **Class:** `{{mutatedClass}}`
+- **Method:** `{{mutatedMethod}}`
+- **Line:** {{lineNumber}}
+- **Mutation:** {{mutatorDescription}}
+- **Mutator:** `{{mutator}}`
+
+## Code context
 
 The `>>>` marker shows the mutated line:
 
@@ -16,26 +18,49 @@ The `>>>` marker shows the mutated line:
 {{contextAroundMutation}}
 ```
 
-## Full Method
+{{#if methodSource}}
+## Mutated method
 
 ```java
-{{mutatedMethod}}
+{{methodSource}}
 ```
+{{/if}}
+
+{{#if sourceCode}}
+## Full source of `{{sourceFile}}`
+
+```java
+{{sourceCode}}
+```
+{{/if}}
+
+## Test class
+
+Add the new test to `{{testClassName}}`. Use {{testFramework}}.
 
 {{#if existingTestCode}}
-## Existing Test Class
+### Current content of `{{testClassName}}`
 
 ```java
 {{existingTestCode}}
 ```
 {{/if}}
 
+{{#if feedback}}
+## Previous attempts that did NOT work
+
+Each attempt below was applied, compiled and run. Read the result carefully and do something
+different this time: fix the compile error, fix the wrong expectation, or (if the mutant
+survived) make the assertion depend on the mutated behaviour.
+
+{{feedback}}
+{{/if}}
+
 ## Task
 
 Write a test method that will:
-1. **FAIL** when this mutation is applied
-2. **PASS** on the original code
+1. **FAIL** when this mutation is applied, and
+2. **PASS** on the original code.
 
-This ensures the mutation gets killed.
-
-The test should specifically verify the behavior at line {{lineNumber}} that the mutation changes.
+The test must exercise line {{lineNumber}} and assert on the behaviour the mutation changes.
+Reply with a single Java code block containing any imports followed by the test method(s).

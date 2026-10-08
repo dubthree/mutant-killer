@@ -1,0 +1,56 @@
+diff --git a/src/test/java/org/json/junit/CDLTest.java b/src/test/java/org/json/junit/CDLTest.java
+index e5eb9ed..0b1ab48 100644
+--- a/src/test/java/org/json/junit/CDLTest.java
++++ b/src/test/java/org/json/junit/CDLTest.java
+@@ -11,6 +11,7 @@ import org.json.JSONException;
+ import org.json.JSONObject;
+ import org.json.JSONArray;
+ import org.json.CDL;
++import org.json.JSONTokener;
+ 
+ /**
+  * Tests for CDL.java.
+@@ -389,4 +390,42 @@ public class CDLTest {
+     }
+     
+ 
++
++    @Test
++    public void emptyMiddleValueIsParsedAsEmptyString() {
++        JSONArray row = CDL.rowToJSONArray(new JSONTokener("a,,b"));
++        assertNotNull(row);
++        assertEquals(3, row.length());
++        assertEquals("a", row.getString(0));
++        assertEquals("", row.getString(1));
++        assertEquals("b", row.getString(2));
++    }
++
++    @Test
++    public void rowToStringQuotesValueStartingWithDelimiter() {
++        JSONArray row = new JSONArray();
++        row.put(",abc");
++        assertEquals("\",abc\"\n", CDL.rowToString(row));
++    }
++
++    @Test
++    public void rowToStringQuotesValueStartingWithNewline() {
++        JSONArray row = new JSONArray();
++        row.put("\nabc");
++        assertEquals("\"abc\"\n", CDL.rowToString(row));
++    }
++
++    @Test
++    public void rowToStringQuotesValueStartingWithCarriageReturn() {
++        JSONArray row = new JSONArray();
++        row.put("\rabc");
++        assertEquals("\"abc\"\n", CDL.rowToString(row));
++    }
++
++    @Test
++    public void rowToStringQuotesValueStartingWithNullCharacter() {
++        JSONArray row = new JSONArray();
++        row.put("\0abc");
++        assertEquals("\"abc\"\n", CDL.rowToString(row));
++    }
+ }
+\ No newline at end of file

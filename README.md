@@ -1,185 +1,136 @@
 # Mutant Killer 🔪
 
-An autonomous agent that clones a repository, runs [PIT](https://pitest.org/) mutation testing, and creates pull requests to kill surviving mutants.
+An autonomous agent that runs [PIT](https://pitest.org/) mutation testing on a Java project, asks
+Claude for a test that kills each surviving mutant, **proves the test works** (it must compile,
+pass, and make PIT report the mutant as killed), and opens one pull request per fix.
 
-## What It Does
+## How it works
 
-1. **Clones** a GitHub repository
-2. **Runs** PIT mutation testing
-3. **Analyzes** each surviving mutant with Claude
-4. **Creates PRs** — one branch and PR per mutant fix
+```
+clone repo ─► run PIT ─► pick surviving mutants ─► for each mutant:
+                                                      ├─ locate source + test class
+                                                      ├─ ask Claude for a test
+                                                      ├─ apply, compile, run the test class
+                                                      ├─ re-run PIT scoped to the class
+                                                      ├─ failed? feed the error back, retry
+                                                      └─ verified? commit, push, open PR
+```
 
-## Quick Start
+PIT does not need to be configured in the target project: the Maven plugin (or the Gradle
+plugin, through an init script) is added temporarily for the run and removed afterwards.
+
+## Quick start
 
 ```bash
-# Set your tokens
-export ANTHROPIC_API_KEY=your_anthropic_key
-export GITHUB_TOKEN=your_github_token
+mvn -q package      # builds target/mutant-killer-0.2.0-SNAPSHOT.jar
+alias mutant-killer='java -jar target/mutant-killer-0.2.0-SNAPSHOT.jar'
 
-# Run against a repository
-java -jar mutant-killer.jar run https://github.com/user/repo
+# Try it on a public repo without touching GitHub: generates and verifies tests in a local clone
+mutant-killer run https://github.com/stleary/JSON-java --dry-run --max-mutants 5 \
+    --target-classes 'org.json.CDL*' --target-tests 'org.json.junit.*' --report cdl.json
+
+# The real thing: one PR per killed mutant
+export GITHUB_TOKEN=...
+mutant-killer run https://github.com/you/your-repo --max-mutants 10
 ```
 
-That's it. The agent will:
-1. Clone the repo
-2. Run mutation tests
-3. Create a PR for each surviving mutant it can fix
+### Choosing how Claude is called
 
-## Installation
+| `--backend` | Uses | Needs |
+|-------------|------|-------|
+| `api`  | Anthropic Messages API (official Java SDK) | `ANTHROPIC_API_KEY` |
+| `cli`  | Claude Code CLI (`claude -p`), i.e. your Claude subscription or an already logged-in session | `claude` on the PATH, logged in |
+| `auto` (default) | `api` when the key is set, otherwise `cli` | |
 
-```bash
-git clone https://github.com/dubthree/mutant-killer.git
-cd mutant-killer
-mvn clean package
-```
+The CLI backend runs with tools disabled and no session persistence, so each call is a plain
+completion billed to your Claude plan rather than to API credits. `--model` accepts a full id
+(`claude-opus-5-5`, the default) or, with the CLI backend, an alias such as `sonnet`.
 
-## Usage
+## Commands
 
-### Full Autonomous Mode
+### `run <repo-url>` — clone, test, open PRs
 
-```bash
-java -jar target/mutant-killer-0.1.0-SNAPSHOT.jar run https://github.com/user/repo \
-  --max-mutants 10 \
-  --model claude-opus-4-20250514
-```
+| Option | Default | Meaning |
+|--------|---------|---------|
+| `-b, --base-branch` | remote default | Branch to start from |
+| `--dry-run` | off | Generate and verify in the clone only; no commit/push/PR, no token needed |
+| `--max-mutants` | 10 | Mutants to process (spread round-robin across classes) |
+| `--max-attempts` | 3 | Model retries per mutant, each with the previous failure as feedback |
+| `--no-verify` | off | Skip the scoped PIT re-run (faster, but only "tests pass" is checked) |
+| `--include-no-coverage` | off | Also target `NO_COVERAGE` mutants (needs brand-new tests) |
+| `--target-classes` | project default | PIT `targetClasses` glob(s), e.g. `com.acme.util.*` |
+| `--target-tests` | same as target classes | PIT `targetTests` glob(s); set it when tests live in another package, e.g. `org.json.junit.*` |
+| `--build-system` | auto | `maven` or `gradle` when both files exist |
+| `--build-timeout` | 60 | Minutes per build/PIT invocation |
+| `--work-dir` | temp dir | Where to clone; logs land in `<work-dir>/logs` |
+| `--report` | none | Write a JSON report (outcomes, attempts, tokens, cost) |
+| `--token` | `GITHUB_TOKEN`/`GITLAB_TOKEN`/`AZURE_DEVOPS_TOKEN` | Hosting token for push + PR |
+| `--prompt-dir` | bundled | Custom `system.md` / `analyze.md` |
+| `-v` | off | Stream build output |
 
-Options:
-- `--base-branch`: Branch to work from (default: `main`)
-- `--model`: Claude model (default: `claude-sonnet-4-20250514`)
-- `--max-mutants`: Max mutants to process (default: 10)
-- `--dry-run`: Analyze without creating PRs
-- `--work-dir`: Where to clone repos
-- `--prompt-dir`: Custom prompt templates
-- `--verbose`: Show detailed output
+### `kill [mutations.xml] --project <dir>` — local, no git
 
-### Dry Run (Preview)
+Same loop on a checkout you already have. If no report is given PIT is run first. Changes stay in
+the working tree for you to review with `git diff`.
 
-```bash
-java -jar target/mutant-killer-0.1.0-SNAPSHOT.jar run https://github.com/user/repo --dry-run
-```
+### `analyze <mutations.xml>...` — just read a report
 
-Shows what fixes would be generated without creating any PRs.
+Prints counts per status, the mutation score, and the surviving mutants.
 
-### Analyze Existing Report
+## What "verified" means
 
-If you already have a PIT report:
+A mutant counts as killed only when, after adding the generated test:
 
-```bash
-java -jar target/mutant-killer-0.1.0-SNAPSHOT.jar analyze path/to/mutations.xml
-```
+1. the build tool compiles and runs the test class successfully, **and**
+2. PIT, re-run with `targetClasses=<mutated class>*` and `targetTests=<test class>`, reports that
+   exact mutant as `KILLED` (or `TIMED_OUT`).
 
-### Local Kill Mode
+If either step fails the change is reverted, the failure (compiler output, failing assertion, or
+"mutant still survived") is appended to the next prompt, and the model gets another attempt.
+Every outcome is recorded in the `--report` JSON.
 
-Generate fixes for a local project without PRs:
+## Custom prompts
 
-```bash
-java -jar target/mutant-killer-0.1.0-SNAPSHOT.jar kill path/to/mutations.xml \
-  --source src/main/java \
-  --test src/test/java
-```
+Copy `src/main/resources/prompts/` somewhere, edit, and pass `--prompt-dir`. `analyze.md`
+supports `{{variable}}` and `{{#if variable}}...{{/if}}`. Variables: `mutatedClass`,
+`mutatedMethod`, `lineNumber`, `mutator`, `mutatorDescription`, `contextAroundMutation`,
+`methodSource`, `sourceFile`, `sourceCode`, `testClassName`, `testFramework`,
+`existingTestCode`, `feedback` (previous failed attempts).
 
-## Custom Prompts
+## Supported git providers
 
-You can customize how mutants are analyzed by providing your own prompt templates.
+| Provider | URL pattern | Token |
+|----------|-------------|-------|
+| GitHub | `github.com/owner/repo` | PAT with `repo` scope |
+| GitLab (incl. self-hosted) | `gitlab.example.com/group/sub/repo` | PAT with `api` scope |
+| Azure DevOps | `dev.azure.com/org/project/_git/repo` | PAT with Code read/write |
 
-Create a directory with your prompts:
-
-```
-my-prompts/
-├── system.md    # System prompt for Claude
-└── analyze.md   # Per-mutant analysis prompt
-```
-
-Then run with:
-
-```bash
-java -jar mutant-killer.jar run https://github.com/user/repo --prompt-dir ./my-prompts
-```
-
-### Default Prompts
-
-See `src/main/resources/prompts/` for the default templates you can customize.
-
-**system.md** — Defines Claude's role and guidelines for generating tests.
-
-**analyze.md** — Template for each mutation, with placeholders:
-- `{{mutatedClass}}`, `{{mutatedMethod}}`, `{{lineNumber}}`
-- `{{mutatorDescription}}`, `{{contextAroundMutation}}`
-- `{{existingTestCode}}`
-
-## How It Works
-
-```
-┌──────────────────┐
-│  Clone Repo      │
-└────────┬─────────┘
-         │
-         ▼
-┌──────────────────┐
-│  Run PIT         │──► Detect Maven/Gradle
-└────────┬─────────┘    Run mutation tests
-         │
-         ▼
-┌──────────────────┐
-│  Parse Report    │──► Find surviving mutants
-└────────┬─────────┘
-         │
-         ▼
-┌──────────────────────────────────────────┐
-│  For each mutant:                        │
-│  1. Create branch: mutant-killer/fix-xxx │
-│  2. Analyze with Claude                  │
-│  3. Generate test improvement            │
-│  4. Commit and push                      │
-│  5. Create PR                            │
-└──────────────────────────────────────────┘
-```
+Tokens are sent as a per-command HTTP header and never written into the clone.
 
 ## Requirements
 
-- Java 21+
-- Maven or Gradle (for target projects)
-- PIT plugin configured in target project (or uses default config)
-- Git hosting token (GitHub, GitLab, or Azure DevOps)
-- Anthropic API key
-
-## Supported Git Providers
-
-| Provider | URL Pattern | Token Type |
-|----------|-------------|------------|
-| **GitHub** | `github.com/owner/repo` | Personal Access Token |
-| **GitLab** | `gitlab.com/group/repo` | Personal Access Token |
-| **Azure DevOps** | `dev.azure.com/org/project/_git/repo` | Personal Access Token |
-
-Self-hosted GitLab instances are also supported. The provider is auto-detected from the URL.
-
-## PR Format
-
-Each generated PR includes:
-- **Title**: `Kill mutant in ClassName.methodName`
-- **Body**: Mutation details, explanation, and the generated test code
-- **Branch**: `mutant-killer/fix-<class>-<method>-<line>-<index>`
-
-## Supported Models
-
-- `claude-opus-4-20250514` — Most capable, best for complex mutations
-- `claude-sonnet-4-20250514` — Default, good balance of speed and quality
+- Java 21+ to run mutant-killer; the target project builds with its own wrapper (`mvnw`/`gradlew`) or `mvn`/`gradle` on the PATH
+- Target project: Maven or Gradle, JUnit 4, JUnit 5 or TestNG, compiling with passing tests
+- An Anthropic API key **or** a logged-in Claude Code CLI
 
 ## Limitations
 
-- Java projects only (Maven or Gradle)
-- Requires PIT for mutation testing
-- Target project must compile and have tests
-- Generated tests should be reviewed before merging
+- Java only.
+- If the project already configures PIT with explicit `targetClasses`, Maven ignores the
+  command-line override, so the verification run is a full PIT run (slower, still correct).
+- One PR per mutant; large projects will want `--max-mutants` kept small or `--target-classes`.
+- Generated tests should still be reviewed before merging.
 
-## Contributing
+## Development
 
-Areas of interest:
-- Support for Gradle Kotlin DSL
-- Support for other languages (Stryker for JS/TS, mutmut for Python)
-- Improved prompt engineering
-- Batch PR creation
-- Integration with CI/CD
+```bash
+mvn test                                    # unit tests
+mvn test-compile org.pitest:pitest-maven:mutationCoverage   # PIT on mutant-killer itself
+```
+
+See `docs/REVIEW.md` for the review that drove the 0.2.0 changes and the open follow-ups, and
+`docs/LIVE_RUNS.md` for results against JSON-java and Apache commons-text (13 of 15 mutants
+killed and verified; the other 2 were equivalent mutants and correctly left alone).
 
 ## License
 
