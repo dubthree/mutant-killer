@@ -86,6 +86,13 @@ public class KillLoop {
                 response.inputTokens(), response.outputTokens(),
                 response.hasCost() ? String.format(", $%.4f", response.costUsd()) : ""));
 
+            if (isEquivalentVerdict(response.text())) {
+                log.accept("  model judged the mutant equivalent; stopping");
+                return new KillResult(mutant, KillResult.Status.EQUIVALENT, attempt, null, analysis.testClassFqn(), lastCode,
+                    "Judged equivalent by the model: " + firstLine(explanation(response.text())),
+                    history, inTokens, outTokens, costKnown ? cost : Double.NaN, Duration.between(start, Instant.now()));
+            }
+
             GeneratedTest generated = GeneratedTest.parse(response.text());
             lastCode = generated.rawCode();
             if (generated.isEmpty()) {
@@ -207,6 +214,24 @@ public class KillLoop {
         } catch (IOException e) {
             log.accept("  warning: could not revert " + edit.file() + ": " + e.getMessage());
         }
+    }
+
+    /**
+     * The reply starts with the word EQUIVALENT (optionally after whitespace or markdown emphasis).
+     */
+    static boolean isEquivalentVerdict(String reply) {
+        if (reply == null) {
+            return false;
+        }
+        String head = reply.strip().replaceAll("^[*_`#\\s]+", "");
+        return head.regionMatches(true, 0, "EQUIVALENT", 0, "EQUIVALENT".length())
+            && !head.contains("```");
+    }
+
+    private static String explanation(String reply) {
+        String head = reply.strip().replaceAll("^[*_`#\\s]+", "");
+        String rest = head.substring("EQUIVALENT".length()).strip();
+        return rest.replaceAll("^[:*_.\\-\\s]+", "");
     }
 
     private static String firstLine(String s) {

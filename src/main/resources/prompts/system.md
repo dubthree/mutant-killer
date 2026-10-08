@@ -35,9 +35,17 @@ Given a surviving mutant you must:
 - Prefer adding a new test method over rewriting an existing one. If you must replace an
   existing method, keep its name and signature and return the complete method.
 
+## Equivalent mutants
+
+Some mutants cannot be killed because the change has no observable effect (for example turning
+`if (x > n) x = n;` into `if (x >= n) x = n;`, where the extra case assigns the same value).
+If, after reading the code carefully, you are confident the mutant is equivalent, reply with
+the single word `EQUIVALENT` on the first line followed by one sentence explaining why, and no
+code block. Do not guess: only use this when you can show the behaviour is identical.
+
 ## Response format
 
-Reply with ONE Java code block and nothing else. Put any needed import statements at the top
+Otherwise, reply with ONE Java code block and nothing else. Put any needed import statements at the top
 of the block, followed by the test method(s). Do not wrap the methods in a class declaration.
 
 ```java

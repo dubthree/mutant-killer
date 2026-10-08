@@ -44,6 +44,8 @@ public record KillResult(
         TESTS_PASS_UNVERIFIED,
         /** Every attempt failed (did not compile, test failed, or the mutant still survived). */
         FAILED,
+        /** The model judged the mutant equivalent (no observable behaviour change), so no test can kill it. */
+        EQUIVALENT,
         /** Could not even try: source/test file not found, build broken, model unavailable. */
         ERROR
     }

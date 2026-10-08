@@ -238,6 +238,29 @@ class KillLoopTest {
     }
 
     @Test
+    void equivalentVerdictStopsEarly() throws Exception {
+        String original = Files.readString(testFile);
+        llm.replies.add("**EQUIVALENT**: the extra `==` case assigns the same value, so behaviour is identical.");
+        llm.replies.add(GOOD);
+        KillResult r = loop.kill(MUTANT);
+        assertEquals(KillResult.Status.EQUIVALENT, r.status());
+        assertEquals(1, r.attempts());
+        assertTrue(r.message().contains("assigns the same value"), r.message());
+        assertEquals(original, Files.readString(testFile));
+        assertTrue(build.testRunsSeen.isEmpty());
+        assertFalse(r.success());
+    }
+
+    @Test
+    void equivalentWordInsideCodeIsNotAVerdict() {
+        assertFalse(KillLoop.isEquivalentVerdict("```java\n// EQUIVALENT check\n@Test void x() {}\n```"));
+        assertFalse(KillLoop.isEquivalentVerdict("This is not equivalent.\n```java\nvoid x() {}\n```"));
+        assertTrue(KillLoop.isEquivalentVerdict("EQUIVALENT - no behaviour change"));
+        assertTrue(KillLoop.isEquivalentVerdict("  equivalent: same result"));
+        assertFalse(KillLoop.isEquivalentVerdict(null));
+    }
+
+    @Test
     void modelFailureIsAnError() {
         KillResult r = loop.kill(MUTANT);
         assertEquals(KillResult.Status.ERROR, r.status());
