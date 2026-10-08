@@ -118,6 +118,15 @@ public class KillCommand implements Callable<Integer> {
                 }
                 report.add(result, null);
             }
+        } catch (io.github.dubthree.mutantkiller.build.BuildException e) {
+            System.err.println("Build failed: " + e.getMessage());
+            if (e.result() != null && e.result().logFile() != null) {
+                System.err.println("Full log: " + e.result().logFile());
+            }
+            if (config.verbose()) {
+                e.printStackTrace();
+            }
+            return 1;
         } finally {
             build.cleanup();
         }

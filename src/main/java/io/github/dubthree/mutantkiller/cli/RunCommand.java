@@ -193,6 +193,15 @@ public class RunCommand implements Callable<Integer> {
                     }
                 }
             }
+        } catch (io.github.dubthree.mutantkiller.build.BuildException e) {
+            System.err.println("Build failed: " + e.getMessage());
+            if (e.result() != null && e.result().logFile() != null) {
+                System.err.println("Full log: " + e.result().logFile());
+            }
+            if (config.verbose()) {
+                e.printStackTrace();
+            }
+            return 1;
         } finally {
             build.cleanup();
         }

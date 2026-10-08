@@ -89,4 +89,19 @@ class BuildExecutorTest {
         assertEquals(TestFramework.JUNIT4, TestFramework.fromBuildFile("testImplementation 'junit:junit:4.13.2'"));
         assertEquals(TestFramework.JUNIT5, TestFramework.fromBuildFile("test { useJUnitPlatform() }"));
     }
+
+    @Test
+    void gradleWrapperTooOldForJdkIsDetected(@TempDir Path dir) throws Exception {
+        Files.writeString(dir.resolve("build.gradle"), "");
+        Files.createDirectories(dir.resolve("gradle/wrapper"));
+        Files.writeString(dir.resolve("gradle/wrapper/gradle-wrapper.properties"),
+            "distributionUrl=https\\://services.gradle.org/distributions/gradle-6.3-bin.zip\n");
+        GradleExecutor g = (GradleExecutor) BuildExecutor.detect(dir, null, Duration.ofMinutes(1), false, null);
+        assertEquals("6.3", g.wrapperVersion());
+        assertEquals("8.5", GradleExecutor.minimumGradleForJdk(21));
+        assertNull(GradleExecutor.minimumGradleForJdk(11));
+        assertTrue(GradleExecutor.compareVersions("6.3", "8.5") < 0);
+        assertTrue(GradleExecutor.compareVersions("8.10", "8.5") > 0);
+        assertEquals(0, GradleExecutor.compareVersions("8.5", "8.5.0"));
+    }
 }

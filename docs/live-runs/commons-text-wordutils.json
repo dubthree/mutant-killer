@@ -1,0 +1,183 @@
+{
+  "target": "https://github.com/apache/commons-text",
+  "backend": "Claude Code CLI",
+  "model": "claude-opus-5-5",
+  "startedAt": "2026-10-08T03:04:14.858217830Z",
+  "finishedAt": "2026-10-08T03:45:13.476037315Z",
+  "pitBaseline": {
+    "totalMutants": 145,
+    "detected": 135,
+    "survived": 9,
+    "noCoverage": 1
+  },
+  "totals": {
+    "processed": 6,
+    "succeeded": 4,
+    "inputTokens": 342573,
+    "outputTokens": 9956,
+    "costUsd": 2.8720056
+  },
+  "notes": {
+    "build": "PIT plugin (1.30.0) temporarily added to pom.xml"
+  },
+  "mutants": [
+    {
+      "mutatedClass": "org.apache.commons.text.WordUtils",
+      "mutatedMethod": "abbreviate",
+      "lineNumber": 85,
+      "mutator": "org.pitest.mutationtest.engine.gregor.mutators.ConditionalsBoundaryMutator",
+      "description": "changed conditional boundary",
+      "originalStatus": "SURVIVED",
+      "outcome": "FAILED",
+      "attempts": 3,
+      "message": "Gave up after 3 attempt(s): The test compiles and passes, but PIT still reports this mutant as [SURVIVED] when running org.apache.commons.text.WordUtilsTest against it. The new test does not exercise the mutated behaviour (line 85: changed conditional boundary) with an assertion that would fail under the mutation. Write a test whose assertion depends on exactly that behaviour.",
+      "testFile": null,
+      "testClass": "org.apache.commons.text.WordUtilsTest",
+      "generatedCode": "import static org.junit.jupiter.api.Assertions.assertEquals;\n\nimport org.junit.jupiter.api.Test;\n\n// This mutant (line 85, '>' -> '>=') cannot be killed by any test.\n// The two conditions differ only when lower == str.length(). In that case the\n// mutated code runs \"lower = str.length()\", which stores the value lower already\n// holds into a local variable. Nothing observable changes: not the return value,\n// not an exception, and not any state. The mutant should be marked equivalent or\n// excluded in the PIT configuration.\n// The test below pins the behaviour on both sides of the boundary for regression.\n@Test\nvoid abbreviateLowerAtAndAroundLengthBoundary() {\n    // lower == length: no space found from index 5, so the whole string is returned and nothing is appended\n    assertEquals(\"ab cd\", WordUtils.abbreviate(\"ab cd\", 5, -1, \"!\"));\n    // lower > length: lower is clamped to the length, giving the same result\n    assertEquals(\"ab cd\", WordUtils.abbreviate(\"ab cd\", 100, -1, \"!\"));\n    // lower == length - 1: the trailing space is found, so the string is cut and the suffix appended\n    assertEquals(\"abcd!\", WordUtils.abbreviate(\"abcd \", 4, -1, \"!\"));\n    // lower == length with a trailing space: the search starts past the space, so the string is unchanged\n    assertEquals(\"abcd \", WordUtils.abbreviate(\"abcd \", 5, -1, \"!\"));\n}",
+      "pullRequest": null,
+      "inputTokens": 93668,
+      "outputTokens": 2383,
+      "costUsd": 0.7785408,
+      "elapsedSeconds": 138,
+      "failedAttempts": [
+        {
+          "attempt": "1",
+          "problem": "The test compiles and passes, but PIT still reports this mutant as [SURVIVED] when running org.apache.commons.text.WordUtilsTest against it. The new test does not exercise the mutated behaviour (line 85: changed conditional boundary) with an assertion that would fail under the mutation. Write a test",
+          "code": "import static org.junit.jupiter.api.Assertions.assertEquals;\n\nimport org.junit.jupiter.api.Test;\n\n// Note: with lower == str.length() the mutated condition (>=) only reassigns lower to the\n// value it already holds, so this mutant is likely equivalent and no test can kill it.\n// These tests pin the boundary behaviour around line 85 for documentation and regression.\n@Test\nvoid abbreviateWithLowerEqualToLengthReturnsWholeStringWithoutAppend() {\n    assertEquals(\"01 23\", WordUtils.abbreviate(\"01 23\", 5, -1, \"...\"));\n    assertEquals(\"01 23\", WordUtils.abbreviate(\"01 23\", 5, 5, \"...\"));\n}\n\n@Test\nvoid abbreviateWithLowerOneBelowLengthFindsNoSpaceAndKeepsString() {\n    assertEquals(\"01 23\", WordUtils.abbreviate(\"01 23\", 4, -1, \"...\"));\n    assertEquals(\"0123 \", WordUtils.abbreviate(\"0123 \", 4, -1, \"\").length() == 4 ? \"0123 \" : \"0123 \");\n    assertEquals(\"0123...\", WordUtils.abbreviate(\"0123 \", 4, -1, \"...\"));\n}\n\n@Test\nvoid abbreviateWithLowerAboveLengthIsClampedToLength() {\n    assertEquals(\"01 23\", WordUtils.abbreviate(\"01 23\", 6, -1, \"...\"));\n    assertEquals(\"01 23\", WordUtils.abbreviate(\"01 23\", 6, 6, \"...\"));\n}"
+        },
+        {
+          "attempt": "2",
+          "problem": "The test compiles and passes, but PIT still reports this mutant as [SURVIVED] when running org.apache.commons.text.WordUtilsTest against it. The new test does not exercise the mutated behaviour (line 85: changed conditional boundary) with an assertion that would fail under the mutation. Write a test",
+          "code": "import static org.junit.jupiter.api.Assertions.assertEquals;\n\nimport org.junit.jupiter.api.Test;\n\n// EQUIVALENT MUTANT (line 85, '>' -> '>='): when lower == str.length() the mutated branch\n// performs \"lower = str.length()\", reassigning the identical value to a local variable.\n// No observable behaviour changes, so no test can kill this mutant; it should be excluded\n// in the PIT configuration. These tests pin the boundary behaviour for regression purposes.\n@Test\nvoid abbreviateLowerExactlyAtLengthReturnsWholeStringWithoutAppend() {\n    assertEquals(\"ab cd\", WordUtils.abbreviate(\"ab cd\", 5, -1, \"!\"));\n    assertEquals(\"ab cd\", WordUtils.abbreviate(\"ab cd\", 5, 5, \"!\"));\n}\n\n@Test\nvoid abbreviateLowerOneAboveLengthIsClampedAndReturnsWholeString() {\n    assertEquals(\"ab cd\", WordUtils.abbreviate(\"ab cd\", 6, -1, \"!\"));\n    assertEquals(\"ab cd\", WordUtils.abbreviate(\"ab cd\", 6, 6, \"!\"));\n}\n\n@Test\nvoid abbreviateLowerOneBelowLengthStillSearchesForTrailingSpace() {\n    assertEquals(\"abcd!\", WordUtils.abbreviate(\"abcd \", 4, -1, \"!\"));\n}"
+        },
+        {
+          "attempt": "3",
+          "problem": "The test compiles and passes, but PIT still reports this mutant as [SURVIVED] when running org.apache.commons.text.WordUtilsTest against it. The new test does not exercise the mutated behaviour (line 85: changed conditional boundary) with an assertion that would fail under the mutation. Write a test",
+          "code": "import static org.junit.jupiter.api.Assertions.assertEquals;\n\nimport org.junit.jupiter.api.Test;\n\n// This mutant (line 85, '>' -> '>=') cannot be killed by any test.\n// The two conditions differ only when lower == str.length(). In that case the\n// mutated code runs \"lower = str.length()\", which stores the value lower already\n// holds into a local variable. Nothing observable changes: not the return value,\n// not an exception, and not any state. The mutant should be marked equivalent or\n// excluded in the PIT configuration.\n// The test below pins the behaviour on both sides of the boundary for regression.\n@Test\nvoid abbreviateLowerAtAndAroundLengthBoundary() {\n    // lower == length: no space found from index 5, so the whole string is returned and nothing is appended\n    assertEquals(\"ab cd\", WordUtils.abbreviate(\"ab cd\", 5, -1, \"!\"));\n    // lower > length: lower is clamped to the length, giving the same result\n    assertEquals(\"ab cd\", WordUtils.abbreviate(\"ab cd\", 100, -1, \"!\"));\n    // lower == length - 1: the trailing space is found, so the string is cut and the suffix appended\n    assertEquals(\"abcd!\", WordUtils.abbreviate(\"abcd \", 4, -1, \"!\"));\n    // lower == length with a trailing space: the search starts past the space, so the string is unchanged\n    assertEquals(\"abcd \", WordUtils.abbreviate(\"abcd \", 5, -1, \"!\"));\n}"
+        }
+      ]
+    },
+    {
+      "mutatedClass": "org.apache.commons.text.WordUtils",
+      "mutatedMethod": "abbreviate",
+      "lineNumber": 90,
+      "mutator": "org.pitest.mutationtest.engine.gregor.mutators.ConditionalsBoundaryMutator",
+      "description": "changed conditional boundary",
+      "originalStatus": "SURVIVED",
+      "outcome": "FAILED",
+      "attempts": 3,
+      "message": "Gave up after 3 attempt(s): The test compiles and passes, but PIT still reports this mutant as [SURVIVED] when running org.apache.commons.text.WordUtilsTest against it. The new test does not exercise the mutated behaviour (line 90: changed conditional boundary) with an assertion that would fail under the mutation. Write a test whose assertion depends on exactly that behaviour.",
+      "testFile": null,
+      "testClass": "org.apache.commons.text.WordUtilsTest",
+      "generatedCode": "import static org.junit.jupiter.api.Assertions.assertEquals;\n\nimport org.junit.jupiter.api.Test;\n\n/*\n * This mutant cannot be killed: it is an equivalent mutant.\n *\n * Line 90 changes `upper > str.length()` to `upper >= str.length()`. The two\n * conditions differ only when upper == str.length(). In that case the mutated\n * code runs `upper = str.length()`, which assigns the value upper already holds.\n * Every later statement sees the same `upper`, so the result is the same for\n * every input. No test can pass on the original code and fail on the mutant.\n *\n * Recommended action: mark this mutant as equivalent in the PIT configuration.\n * The test below pins the behaviour at the exact boundary as a regression check.\n * It does not and cannot kill this mutant.\n */\n@Test\nvoid abbreviateUpperEqualToLengthIsNotTreatedAsAbbreviation() {\n    // No space at or after lower, upper == length: no truncation and no suffix\n    assertEquals(\"abcdef\", WordUtils.abbreviate(\"abcdef\", 2, 6, \"...\"));\n    // Space found before upper == length: cut at the space and add the suffix\n    assertEquals(\"ab...\", WordUtils.abbreviate(\"ab cdef\", 1, 7, \"...\"));\n    // Same result as no limit\n    assertEquals(WordUtils.abbreviate(\"abcdef\", 2, -1, \"...\"), WordUtils.abbreviate(\"abcdef\", 2, 6, \"...\"));\n}",
+      "pullRequest": null,
+      "inputTokens": 93247,
+      "outputTokens": 2364,
+      "costUsd": 0.7747928,
+      "elapsedSeconds": 137,
+      "failedAttempts": [
+        {
+          "attempt": "1",
+          "problem": "The test compiles and passes, but PIT still reports this mutant as [SURVIVED] when running org.apache.commons.text.WordUtilsTest against it. The new test does not exercise the mutated behaviour (line 90: changed conditional boundary) with an assertion that would fail under the mutation. Write a test",
+          "code": "import static org.junit.jupiter.api.Assertions.assertEquals;\n\nimport org.junit.jupiter.api.Test;\n\n@Test\nvoid abbreviateWithUpperEqualToLengthReturnsWholeStringWithoutAppend() {\n    // upper == str.length() is the exact boundary of the condition on line 90\n    assertEquals(\"0123456789\", WordUtils.abbreviate(\"0123456789\", 0, 10, \"-\"));\n    assertEquals(\"01234 6789\", WordUtils.abbreviate(\"01234 6789\", 6, 10, \"-\"));\n    assertEquals(\"01234-\", WordUtils.abbreviate(\"01234 6789\", 2, 10, \"-\"));\n    // one past the boundary must still clamp to the length\n    assertEquals(\"0123456789\", WordUtils.abbreviate(\"0123456789\", 0, 11, \"-\"));\n    // one below the boundary must abbreviate and append\n    assertEquals(\"012345678-\", WordUtils.abbreviate(\"0123456789\", 0, 9, \"-\"));\n}"
+        },
+        {
+          "attempt": "2",
+          "problem": "The test compiles and passes, but PIT still reports this mutant as [SURVIVED] when running org.apache.commons.text.WordUtilsTest against it. The new test does not exercise the mutated behaviour (line 90: changed conditional boundary) with an assertion that would fail under the mutation. Write a test",
+          "code": "import static org.junit.jupiter.api.Assertions.assertEquals;\n\nimport org.junit.jupiter.api.Test;\n\n/*\n * NOTE: I could not write a test that kills this mutant, because it looks equivalent.\n * Line 90 changes `upper > str.length()` to `upper >= str.length()`. The two only\n * differ when upper == str.length(). In that case the mutated code runs\n * `upper = str.length()`, which sets upper to the value it already has.\n * Observable behaviour is identical for every input, so no test can pass on the\n * original and fail on the mutant. The test below pins the boundary behaviour as a\n * regression check, but this mutant should be marked equivalent in PIT (or the\n * condition rewritten, e.g. `upper == -1 || upper >= str.length()`) rather than\n * chased with more tests.\n */\n@Test\nvoid abbreviateWithUpperAtExactLengthBoundaryBehavesLikeNoLimit() {\n    final String str = \"ab cd\";\n    // upper == length: same result as an unlimited upper (-1)\n    assertEquals(WordUtils.abbreviate(str, 3, -1, \"!\"), WordUtils.abbreviate(str, 3, 5, \"!\"));\n    assertEquals(\"ab cd\", WordUtils.abbreviate(str, 3, 5, \"!\"));\n    // upper == length with a space after lower: cut at the space\n    assertEquals(\"ab!\", WordUtils.abbreviate(str, 0, 5, \"!\"));\n    // upper one below the length abbreviates and appends\n    assertEquals(\"ab c!\", WordUtils.abbreviate(str, 3, 4, \"!\"));\n}"
+        },
+        {
+          "attempt": "3",
+          "problem": "The test compiles and passes, but PIT still reports this mutant as [SURVIVED] when running org.apache.commons.text.WordUtilsTest against it. The new test does not exercise the mutated behaviour (line 90: changed conditional boundary) with an assertion that would fail under the mutation. Write a test",
+          "code": "import static org.junit.jupiter.api.Assertions.assertEquals;\n\nimport org.junit.jupiter.api.Test;\n\n/*\n * This mutant cannot be killed: it is an equivalent mutant.\n *\n * Line 90 changes `upper > str.length()` to `upper >= str.length()`. The two\n * conditions differ only when upper == str.length(). In that case the mutated\n * code runs `upper = str.length()`, which assigns the value upper already holds.\n * Every later statement sees the same `upper`, so the result is the same for\n * every input. No test can pass on the original code and fail on the mutant.\n *\n * Recommended action: mark this mutant as equivalent in the PIT configuration.\n * The test below pins the behaviour at the exact boundary as a regression check.\n * It does not and cannot kill this mutant.\n */\n@Test\nvoid abbreviateUpperEqualToLengthIsNotTreatedAsAbbreviation() {\n    // No space at or after lower, upper == length: no truncation and no suffix\n    assertEquals(\"abcdef\", WordUtils.abbreviate(\"abcdef\", 2, 6, \"...\"));\n    // Space found before upper == length: cut at the space and add the suffix\n    assertEquals(\"ab...\", WordUtils.abbreviate(\"ab cdef\", 1, 7, \"...\"));\n    // Same result as no limit\n    assertEquals(WordUtils.abbreviate(\"abcdef\", 2, -1, \"...\"), WordUtils.abbreviate(\"abcdef\", 2, 6, \"...\"));\n}"
+        }
+      ]
+    },
+    {
+      "mutatedClass": "org.apache.commons.text.WordUtils",
+      "mutatedMethod": "abbreviate",
+      "lineNumber": 78,
+      "mutator": "org.pitest.mutationtest.engine.gregor.mutators.VoidMethodCallMutator",
+      "description": "removed call to org/apache/commons/lang3/Validate::isTrue",
+      "originalStatus": "SURVIVED",
+      "outcome": "KILLED_VERIFIED",
+      "attempts": 1,
+      "message": "Mutant killed; verified with a scoped PIT run",
+      "testFile": "/tmp/claude-0/-home-user-mutant-killer/d5c26f3c-5b59-5a3a-a3a6-2aa00f3cab33/scratchpad/live/commons-text/commons-text/src/test/java/org/apache/commons/text/WordUtilsTest.java",
+      "testClass": "org.apache.commons.text.WordUtilsTest",
+      "generatedCode": "import static org.junit.jupiter.api.Assertions.assertThrows;\n\n@Test\nvoid testAbbreviateThrowsWhenUpperBelowMinusOneEvenIfNotLessThanLower() {\n    assertThrows(IllegalArgumentException.class, () -> WordUtils.abbreviate(null, -5, -2, null));\n    assertThrows(IllegalArgumentException.class, () -> WordUtils.abbreviate(\"01 23 45\", -5, -2, \"\"));\n}",
+      "pullRequest": null,
+      "inputTokens": 30615,
+      "outputTokens": 473,
+      "costUsd": 0.24822560000000002,
+      "elapsedSeconds": 39,
+      "failedAttempts": []
+    },
+    {
+      "mutatedClass": "org.apache.commons.text.WordUtils",
+      "mutatedMethod": "initials",
+      "lineNumber": 370,
+      "mutator": "org.pitest.mutationtest.engine.gregor.mutators.MathMutator",
+      "description": "Replaced integer division with multiplication",
+      "originalStatus": "SURVIVED",
+      "outcome": "KILLED_VERIFIED",
+      "attempts": 2,
+      "message": "Mutant killed; verified with a scoped PIT run",
+      "testFile": "/tmp/claude-0/-home-user-mutant-killer/d5c26f3c-5b59-5a3a-a3a6-2aa00f3cab33/scratchpad/live/commons-text/commons-text/src/test/java/org/apache/commons/text/WordUtilsTest.java",
+      "testClass": "org.apache.commons.text.WordUtilsTest",
+      "generatedCode": "import static org.junit.jupiter.api.Assertions.assertEquals;\n\nimport java.nio.charset.StandardCharsets;\nimport java.util.Arrays;\n\nimport org.junit.jupiter.api.Test;\n\n@Test\nvoid initialsBufferSizeDoesNotOverflowForHugeInput() {\n    // strLen = 2^30: original buffer size = 2^29 + 1 (valid),\n    // mutated size strLen * 2 + 1 overflows to a negative value -> NegativeArraySizeException.\n    final int len = 1 << 30;\n    String huge;\n    try {\n        byte[] bytes = new byte[len];\n        Arrays.fill(bytes, (byte) 'a');\n        huge = new String(bytes, StandardCharsets.ISO_8859_1);\n        bytes = null;\n    } catch (final OutOfMemoryError e) {\n        return; // not enough heap to construct the input; cannot check\n    }\n    final String result;\n    try {\n        result = WordUtils.initials(huge);\n    } catch (final OutOfMemoryError e) {\n        return; // original buffer allocation needs ~2GB; tolerate a small heap\n    }\n    huge = null;\n    assertEquals(\"a\", result);\n}",
+      "pullRequest": null,
+      "inputTokens": 61980,
+      "outputTokens": 3359,
+      "costUsd": 0.5507112000000001,
+      "elapsedSeconds": 762,
+      "failedAttempts": [
+        {
+          "attempt": "1",
+          "problem": "The test compiles and passes, but PIT still reports this mutant as [SURVIVED] when running org.apache.commons.text.WordUtilsTest against it. The new test does not exercise the mutated behaviour (line 370: Replaced integer division with multiplication) with an assertion that would fail under the muta",
+          "code": "import static org.junit.jupiter.api.Assertions.assertEquals;\n\nimport org.junit.jupiter.api.Test;\n\n/*\n * NOTE: this mutant is effectively equivalent and probably cannot be killed by a reliable unit test.\n *\n * The buffer only has to hold one code point per word. A string of length n has at most\n * ceil(n / 2) words, and n / 2 + 1 is always at least that. The mutated buffer size,\n * n * 2 + 1, is always larger. So the mutant can never cause an out-of-bounds write.\n * It also cannot change the returned string, because only `count` entries are copied out.\n *\n * The only difference you could observe is integer overflow or OutOfMemoryError,\n * for strings longer than about Integer.MAX_VALUE / 2 characters. That is not practical\n * or deterministic in a unit test.\n *\n * The test below covers line 370 at the boundary where the original buffer is exactly full,\n * for both odd and even lengths. It guards against the size becoming too small\n * (for example, removing the \"+ 1\" or using n / 3), but it will not kill the \"/\" -> \"*\" mutant.\n */\n@Test\nvoid initialsFillsBufferExactlyWhenEveryOtherCharIsAWordStart() {\n    // odd length 5: words at 0,2,4 -> 3 initials == 5 / 2 + 1\n    assertEquals(\"abc\", WordUtils.initials(\"a b c\"));\n    // odd length 7: 4 initials == 7 / 2 + 1\n    assertEquals(\"abcd\", WordUtils.initials(\"a b c d\"));\n    // length 1: 1 initial == 1 / 2 + 1\n    assertEquals(\"x\", WordUtils.initials(\"x\"));\n    // even length 6 with trailing delimiter: 3 initials\n    assertEquals(\"abc\", WordUtils.initials(\"a b c \"));\n    // custom delimiters, odd length 9: 5 initials == 9 / 2 + 1\n    assertEquals(\"abcde\", WordUtils.initials(\"a.b.c.d.e\", '.'));\n}"
+        }
+      ]
+    },
+    {
+      "mutatedClass": "org.apache.commons.text.WordUtils",
+      "mutatedMethod": "swapCase",
+      "lineNumber": 465,
+      "mutator": "org.pitest.mutationtest.engine.gregor.mutators.NegateConditionalsMutator",
+      "description": "negated conditional",
+      "originalStatus": "SURVIVED",
+      "outcome": "KILLED_VERIFIED",
+      "attempts": 1,
+      "message": "Mutant killed; verified with a scoped PIT run",
+      "testFile": "/tmp/claude-0/-home-user-mutant-killer/d5c26f3c-5b59-5a3a-a3a6-2aa00f3cab33/scratchpad/live/commons-text/commons-text/src/test/java/org/apache/commons/text/WordUtilsTest.java",
+      "testClass": "org.apache.commons.text.WordUtilsTest",
+      "generatedCode": "import static org.junit.jupiter.api.Assertions.assertEquals;\n\n@Test\nvoid swapCaseUsesTitleCaseForLowerCaseAtWordStartAndUpperCaseInsideWord() {\n    // U+01C6 (lower dz-caron): title case is U+01C5, upper case is U+01C4\n    assertEquals(\"\\u01C5\", WordUtils.swapCase(\"\\u01C6\"));\n    assertEquals(\"A\\u01C4\", WordUtils.swapCase(\"a\\u01C6\"));\n    assertEquals(\"\\u01C5\\u01C4 \\u01C5\", WordUtils.swapCase(\"\\u01C6\\u01C6 \\u01C6\"));\n}",
+      "pullRequest": null,
+      "inputTokens": 31044,
+      "outputTokens": 516,
+      "costUsd": 0.2525176,
+      "elapsedSeconds": 695,
+      "failedAttempts": []
+    },
+    {
+      "mutatedClass": "org.apache.commons.text.WordUtils",
+      "mutatedMethod": "wrap",
+      "lineNumber": 758,
+      "mutator": "org.pitest.mutationtest.engine.gregor.mutators.ConditionalsBoundaryMutator",
+      "description": "changed conditional boundary",
+      "originalStatus": "SURVIVED",
+      "outcome": "KILLED_VERIFIED",
+      "attempts": 1,
+      "message": "Mutant killed; verified with a scoped PIT run",
+      "testFile": "/tmp/claude-0/-home-user-mutant-killer/d5c26f3c-5b59-5a3a-a3a6-2aa00f3cab33/scratchpad/live/commons-text/commons-text/src/test/java/org/apache/commons/text/WordUtilsTest.java",
+      "testClass": "org.apache.commons.text.WordUtilsTest",
+      "generatedCode": "import static org.junit.jupiter.api.Assertions.assertEquals;\n\nimport org.junit.jupiter.api.Test;\n\n@Test\nvoid wrapLengthBelowOneIsTreatedAsOneAndOneIsKept() {\n    // Note: the \"<\" -> \"<=\" boundary mutant on the wrapLength clamp is equivalent:\n    // at wrapLength == 1 it assigns 1 to a value that is already 1.\n    // This test pins the boundary behaviour so any real regression is caught.\n    assertEquals(\"a\\nb\", WordUtils.wrap(\"a b\", 1, \"\\n\", false, \" \"));\n    assertEquals(\"a\\nb\", WordUtils.wrap(\"a b\", 0, \"\\n\", false, \" \"));\n    assertEquals(\"a\\nb\", WordUtils.wrap(\"a b\", -5, \"\\n\", false, \" \"));\n    assertEquals(WordUtils.wrap(\"ab cd ef\", 1, \"\\n\", true, \" \"),\n            WordUtils.wrap(\"ab cd ef\", 0, \"\\n\", true, \" \"));\n}",
+      "pullRequest": null,
+      "inputTokens": 32019,
+      "outputTokens": 861,
+      "costUsd": 0.2672176,
+      "elapsedSeconds": 648,
+      "failedAttempts": []
+    }
+  ]
+}
