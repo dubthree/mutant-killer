@@ -11,7 +11,19 @@ initscript {
     }
 }
 
+// Quality gates and report finalizers are irrelevant to a scratch build and often need extra
+// downloads; turn them off wherever they exist.
+def skippedTasks = ['jacocoTestReport', 'jacocoTestCoverageVerification', 'checkstyleMain', 'checkstyleTest',
+    'spotbugsMain', 'spotbugsTest', 'pmdMain', 'pmdTest', 'javadoc', 'spotlessCheck', 'spotlessJavaCheck',
+    'errorproneMain', 'forbiddenApisMain', 'forbiddenApisTest', 'animalsnifferMain', 'animalsnifferTest',
+    'licenseMain', 'licenseTest', 'rat', 'japicmp', 'cyclonedxBom'] as Set
+
 allprojects { project ->
+    project.tasks.configureEach { task ->
+        if (task.name in skippedTasks) {
+            task.enabled = false
+        }
+    }
     project.plugins.withId('java') {
         if (!project.plugins.hasPlugin('info.solidsoft.pitest')) {
             project.apply plugin: info.solidsoft.gradle.pitest.PitestPlugin

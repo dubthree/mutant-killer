@@ -66,6 +66,7 @@ class KillLoopTest {
     /** Scripted build: test runs and PIT verifications succeed or fail per the queues. */
     static class FakeBuild extends BuildExecutor {
         final Deque<Boolean> testOutcomes = new ArrayDeque<>();
+        final Deque<Boolean> infraFailures = new ArrayDeque<>();
         final Deque<String> pitStatuses = new ArrayDeque<>();
         final List<String> testRunsSeen = new ArrayList<>();
         final List<String> pitTargets = new ArrayList<>();
@@ -118,6 +119,9 @@ class KillLoopTest {
                 testFileContentAtRun.add("<missing>");
             }
             boolean ok = testOutcomes.isEmpty() || testOutcomes.pop();
+            if (!ok && !infraFailures.isEmpty() && infraFailures.pop()) {
+                return new BuildResult(1, "Could not GET 'https://repo.maven.apache.org/x.pom'. Received status code 429", null);
+            }
             return new BuildResult(ok ? 0 : 1, ok ? "BUILD SUCCESS" : "[ERROR] cannot find symbol\n  symbol: method nope()", null);
         }
 
@@ -269,6 +273,19 @@ class KillLoopTest {
         assertEquals(KillResult.Status.UNTESTABLE, r.status());
         assertTrue(r.message().contains("2^30"), r.message());
         assertTrue(build.testRunsSeen.isEmpty());
+    }
+
+    @Test
+    void infrastructureFailureIsRetriedWithoutAskingTheModelAgain() throws Exception {
+        llm.replies.add(GOOD);
+        build.testOutcomes.add(false);
+        build.infraFailures.add(true);
+        build.testOutcomes.add(true);
+        KillResult r = loop.kill(MUTANT);
+        assertEquals(KillResult.Status.KILLED_VERIFIED, r.status());
+        assertEquals(1, r.attempts());
+        assertEquals(2, build.testRunsSeen.size());
+        assertEquals(1, llm.prompts.size());
     }
 
     @Test

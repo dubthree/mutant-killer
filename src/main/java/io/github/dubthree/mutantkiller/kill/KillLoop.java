@@ -118,6 +118,11 @@ public class KillLoop {
             try {
                 log.accept("  compiling and running " + analysis.testSimpleName() + "...");
                 BuildResult testRun = build.runTests(analysis.testClassFqn());
+                if (!testRun.success() && testRun.looksLikeInfrastructureFailure()) {
+                    log.accept("  build failed for an environmental reason (download/network); retrying once"
+                        + (testRun.logFile() != null ? " (log: " + testRun.logFile() + ")" : ""));
+                    testRun = build.runTests(analysis.testClassFqn());
+                }
                 if (!testRun.success()) {
                     problem = "The test class did not compile or its tests failed. Build output:\n"
                         + testRun.errorSummary(60);

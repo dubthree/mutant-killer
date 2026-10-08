@@ -104,4 +104,12 @@ class BuildExecutorTest {
         assertTrue(GradleExecutor.compareVersions("8.10", "8.5") > 0);
         assertEquals(0, GradleExecutor.compareVersions("8.5", "8.5.0"));
     }
+
+    @Test
+    void infrastructureFailuresAreRecognised() {
+        assertTrue(new BuildResult(1, "Could not GET 'https://repo/x.pom'. Received status code 429", null).looksLikeInfrastructureFailure());
+        assertTrue(new BuildResult(1, "[ERROR] Failed to collect dependencies at x:y", null).looksLikeInfrastructureFailure());
+        assertFalse(new BuildResult(1, "[ERROR] cannot find symbol", null).looksLikeInfrastructureFailure());
+        assertFalse(new BuildResult(1, "Tests run: 3, Failures: 1", null).looksLikeInfrastructureFailure());
+    }
 }
