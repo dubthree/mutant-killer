@@ -1,0 +1,63 @@
+diff --git a/src/test/java/org/json/junit/CookieTest.java b/src/test/java/org/json/junit/CookieTest.java
+index edd8a7e..214df31 100644
+--- a/src/test/java/org/json/junit/CookieTest.java
++++ b/src/test/java/org/json/junit/CookieTest.java
+@@ -239,4 +239,58 @@ public class CookieTest {
+         assertTrue("expect unescape() to decode correctly. Actual: " +actualStr+
+                 " expected: " +expectedStr, expectedStr.equals(actualStr));
+     }
++
++    @Test
++    public void escapeLeavesInteriorSpaceUnencoded() {
++        String actualStr = Cookie.escape("a b");
++        assertEquals("a b", actualStr);
++    }
++
++    @Test
++    public void toStringUsesFirstNameAndValueKeysFound() {
++        JSONObject jo = new JSONObject();
++        jo.put("name", "n1");
++        jo.put("Name", "n2");
++        jo.put("NAME", "n3");
++        jo.put("value", "v1");
++        jo.put("Value", "v2");
++        jo.put("VALUE", "v3");
++
++        // Work out which name/value the original loop picks: the first of each
++        // in iteration order, stopping once both have been found.
++        String expectedName = null;
++        String expectedValue = null;
++        for (String key : jo.keySet()) {
++            if ("name".equalsIgnoreCase(key)) {
++                expectedName = jo.getString(key);
++            }
++            if ("value".equalsIgnoreCase(key)) {
++                expectedValue = jo.getString(key);
++            }
++            if (expectedName != null && expectedValue != null) {
++                break;
++            }
++        }
++
++        String result = Cookie.toString(jo);
++        assertEquals(expectedName + "=" + expectedValue, result);
++    }
++
++    @Test
++    public void unescapeLeavesTruncatedPercentSequenceAtEndUnchanged() {
++        assertEquals("a%2", Cookie.unescape("a%2"));
++    }
++
++    @Test
++    public void unescapeDecodesPercentSequenceWithZeroLowNibble() {
++        assertEquals("a b", Cookie.unescape("a%20b"));
++        assertEquals("0", Cookie.unescape("%30"));
++        assertEquals("@x", Cookie.unescape("%40x"));
++    }
++
++    @Test
++    public void unescapeDecodesPercentSequenceWithZeroHighNibble() {
++        assertEquals("\n", Cookie.unescape("%0a"));
++        assertEquals("\u0000", Cookie.unescape("%00"));
++    }
+ }

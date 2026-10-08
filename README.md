@@ -128,7 +128,9 @@ mvn test                                    # unit tests
 mvn test-compile org.pitest:pitest-maven:mutationCoverage   # PIT on mutant-killer itself
 ```
 
-See `docs/REVIEW.md` for the review that drove the 0.2.0 changes and the open follow-ups.
+See `docs/REVIEW.md` for the review that drove the 0.2.0 changes and the open follow-ups, and
+`docs/LIVE_RUNS.md` for results against JSON-java and Apache commons-text (13 of 15 mutants
+killed and verified; the other 2 were equivalent mutants and correctly left alone).
 
 ## License
 

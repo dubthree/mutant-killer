@@ -60,3 +60,15 @@ in this branch or left as a follow-up.
    error and the relevant assertion failure would shorten prompts and likely raise the hit rate.
 7. **`addComment` on providers is unused.** Either wire it up (e.g. to post the verification
    log) or remove it.
+8. **Prompt caching on the API backend.** Prompts are 15-30k tokens and the system prompt plus
+   source file are identical across attempts; a `cache_control` breakpoint after the source
+   section would cut input cost substantially for retries. (The CLI backend already reports
+   cache reads.)
+9. **Equivalent-mutant heuristics.** Boundary mutants of the form `if (x > n) x = n;` are
+   equivalent by construction; detecting the pattern statically would skip the model call
+   entirely.
+10. **Crash safety of the pom injection.** If the JVM is killed mid-run the injected
+    `pitest-maven` plugin stays in the clone's `pom.xml`. Writing the backup to disk and
+    restoring it at the next start would close that gap.
+
+See `LIVE_RUNS.md` for the three public-repository runs that exercised the new pipeline.
