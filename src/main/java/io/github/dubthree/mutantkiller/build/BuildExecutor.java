@@ -310,7 +310,7 @@ public abstract class BuildExecutor {
             "-Dspotless.check.skip=true", "-Dforbiddenapis.skip=true", "-Djacoco.skip=true",
             "-Drat.skip=true", "-Danimal.sniffer.skip=true", "-Dmaven.gitcommitid.skip=true",
             "-Dgpg.skip=true", "-Dmaven.source.skip=true", "-Dformatter.skip=true",
-            "-Dmodernizer.skip=true", "-Derrorprone.skip=true"
+            "-Dmodernizer.skip=true", "-Derrorprone.skip=true", "-Djapicmp.skip=true", "-Dcyclonedx.skip=true"
         );
     }
 }
